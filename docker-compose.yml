@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  
+  db:
+    image: postgres:15-alpine
+    container_name: darkweb_postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=darkweb_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - cti_net
+    healthcheck: 
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: . 
+    container_name: interactive_scraper_app
+    ports:
+      - "8080:8080" # 
+    environment:
+      # Important: we write host=db. Because in docker-compose, the service name acts as the hostname.
+      - DB_SOURCE=host=db port=5432 user=postgres password=postgres dbname=darkweb_db sslmode=disable
+    depends_on:
+      db:
+        condition: service_healthy # 
+    networks:
+      - cti_net
+
+volumes:
+  postgres_data:
+
+networks:
+  cti_net:

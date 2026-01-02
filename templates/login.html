@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Access | Dark Watch</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #0b0d12;
+            color: #e0e6ed;
+            font-family: 'IBM Plex Mono', monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .login-container {
+            width: 350px;
+            padding: 40px;
+            border: 1px solid #393939;
+            background-color: #12141c;
+            position: relative;
+        }
+
+        /* Köşelere teknik detay süsü */
+        .login-container::before {
+            content: '';
+            position: absolute;
+            top: -1px; left: -1px;
+            width: 10px; height: 10px;
+            border-top: 2px solid #0f62fe;
+            border-left: 2px solid #0f62fe;
+        }
+        .login-container::after {
+            content: '';
+            position: absolute;
+            bottom: -1px; right: -1px;
+            width: 10px; height: 10px;
+            border-bottom: 2px solid #0f62fe;
+            border-right: 2px solid #0f62fe;
+        }
+
+        h2 {
+            text-align: center;
+            font-weight: 400;
+            letter-spacing: 2px;
+            margin-bottom: 30px;
+            color: #0f62fe;
+        }
+
+        .form-group { margin-bottom: 20px; }
+
+        label {
+            display: block;
+            font-size: 12px;
+            color: #8c9cad;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        input {
+            width: 100%;
+            background-color: #1b1e2b;
+            border: 1px solid #393939;
+            color: #fff;
+            padding: 12px;
+            font-family: 'IBM Plex Mono', monospace;
+            box-sizing: border-box; /* Padding taşmasını engeller */
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #0f62fe;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #0f62fe;
+            color: white;
+            border: none;
+            font-family: 'IBM Plex Mono', monospace;
+            font-weight: 600;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 10px;
+        }
+
+        button:hover { background-color: #0353e9; }
+
+        .error-msg {
+            color: #fa4d56;
+            font-size: 12px;
+            text-align: center;
+            margin-top: 15px;
+            min-height: 15px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="login-container">
+        <h2>// AUTH_REQ</h2>
+        
+        <form action="/login" method="POST">
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" name="username" required autofocus>
+            </div>
+
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" name="password" required>
+            </div>
+
+            <button type="submit">Initialize Session</button>
+            
+            <div class="error-msg">
+                {{ if .Error }}{{ .Error }}{{ end }}
+            </div>
+        </form>
+    </div>
+
+</body>
+</html>

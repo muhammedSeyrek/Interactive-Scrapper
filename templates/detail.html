@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Intel Analysis | {{ .Title }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #12141c;
+            --bg-panel: #1b1e2b;
+            --text-main: #e0e6ed;
+            --text-muted: #8c9cad;
+            --accent-blue: #0f62fe;
+            --border-color: #393939;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: 'IBM Plex Mono', monospace;
+            margin: 0;
+            padding: 20px;
+            height: 100vh;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .top-bar {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .back-btn {
+            text-decoration: none;
+            color: var(--accent-blue);
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .back-btn:hover { text-decoration: underline; }
+
+        .analysis-grid {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .panel {
+            background-color: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .meta-group { margin-bottom: 20px; }
+        .meta-label { color: var(--text-muted); font-size: 11px; display: block; margin-bottom: 5px; }
+        
+        input, select {
+            background-color: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            color: white;
+            padding: 10px;
+            width: 100%;
+            font-family: 'IBM Plex Mono', monospace;
+            box-sizing: border-box;
+        }
+
+        .btn-save {
+            background-color: var(--accent-blue);
+            color: white;
+            border: none;
+            width: 100%;
+            padding: 12px;
+            cursor: pointer;
+            margin-top: 10px;
+            font-family: 'IBM Plex Mono', monospace; 
+        }
+        .btn-action {
+            display: inline-block;       /* Linkin buton gibi davranması için şart */
+            background: transparent;
+            border: 1px solid var(--text-muted);
+            color: var(--text-muted);
+            padding: 6px 12px;           /* Biraz daha genişlettim */
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;       /* Link alt çizgisini kaldırır */
+            text-align: center;
+        }
+
+        .btn-action:hover {
+            border-color: var(--accent-blue); /* Üzerine gelince mavi çerçeve */
+            color: #fff;
+            background: rgba(15, 98, 254, 0.1); /* Hafif mavi dolgu */
+        }
+
+        .content-area {
+            white-space: pre-wrap;
+            line-height: 1.5;
+            color: #ccc;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="top-bar">
+        <a href="/" class="back-btn">< BACK_TO_DASHBOARD</a>
+        <div style="margin-left: 20px; color: var(--text-muted);">// ANALYZE_ID: {{ .ID }}</div>
+    </div>
+
+    <div class="analysis-grid">
+        <div class="panel">
+            <h3 style="margin-top:0; color: var(--accent-blue);">METADATA</h3>
+            
+            <div class="meta-group">
+                <span class="meta-label">SOURCE</span>
+                <div>{{ .SourceName }}</div>
+            </div>
+
+            <div class="meta-group">
+                <span class="meta-label">DATE</span>
+                <div>{{ .PublishedDate.Format "02 Jan 2006 15:04" }}</div>
+            </div>
+
+            <hr style="border-color: var(--border-color); opacity: 0.3;">
+
+            <form action="/view?id={{ .ID }}" method="POST">
+                <div class="meta-group">
+                    <span class="meta-label">CATEGORY</span>
+                    <input type="text" name="category" value="{{ .Category }}">
+                </div>
+
+                <div class="meta-group">
+                    <span class="meta-label">RISK SCORE (1-10)</span>
+                    <input type="number" name="score" min="1" max="10" value="{{ .CriticalityScore }}">
+                </div>
+
+                <button type="submit" class="btn-save">UPDATE INTEL</button>
+            </form>
+        </div>
+
+        <div class="panel">
+            <span class="meta-label">CAPTURED CONTENT</span>
+            <h2 style="margin-top: 5px;">{{ .Title }}</h2>
+            <div class="content-area">{{ .Content }}</div>
+        </div>
+    </div>
+
+</body>
+</html>
