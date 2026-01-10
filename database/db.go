@@ -59,5 +59,19 @@ func createTables() {
 	if err != nil {
 		log.Fatal("Error creating tables: ", err)
 	}
+
+	queryTargets := `
+		CREATE TABLE IF NOT EXISTS targets (
+			id SERIAL PRIMARY KEY,
+			url TEXT NOT NULL UNIQUE, 
+			source VARCHAR(50) DEFAULT 'manual',
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		);`
+
+	_, err = DB.Exec(queryTargets)
+	if err != nil {
+		log.Fatal("Error creating targets table: ", err)
+	}
+
 	fmt.Println("Tables created or already exist.")
 }

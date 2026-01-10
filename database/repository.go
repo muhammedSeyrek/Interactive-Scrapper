@@ -84,3 +84,45 @@ func GetAllContent() ([]models.DarkWebContent, error) {
 
 	return contents, nil
 }
+
+func AddTarget(url string, source string) error {
+	query := `INSERT INTO targets (url, source) VALUES ($1, $2) ON CONFLICT (url) DO NOTHING`
+	_, err := DB.Exec(query, url, source)
+	return err
+}
+
+func DeleteTarget(id int) error {
+	query := `DELETE FROM targets WHERE id = $1`
+	_, err := DB.Exec(query, id)
+	return err
+}
+
+func GetTargetByID(id int) (models.Target, error) {
+	query := `SELECT id, url, source, created_at FROM targets WHERE id = $1`
+	var t models.Target
+	err := DB.QueryRow(query, id).Scan(&t.ID, &t.URL, &t.Source, &t.CreatedAt)
+	return t, err
+}
+
+func GetAllTargets() ([]models.Target, error) {
+
+	query := `SELECT id, url, source, created_at FROM targets ORDER BY created_at DESC`
+
+	rows, err := DB.Query(query)
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var targets []models.Target
+	for rows.Next() {
+		var t models.Target
+		if err := rows.Scan(&t.ID, &t.URL, &t.Source, &t.CreatedAt); err != nil {
+			return nil, err
+		}
+		targets = append(targets, t)
+	}
+
+	return targets, nil
+}

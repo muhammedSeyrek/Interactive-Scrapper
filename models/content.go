@@ -15,3 +15,10 @@ type DarkWebContent struct {
 	Category         string    `json:"category"`          //
 	CreatedAt        time.Time `json:"created_at"`        //
 }
+
+type Target struct {
+	ID        int       `json:"id"`
+	URL       string    `json:"url"`
+	Source    string    `json:"source"` // yaml, database, etc.
+	CreatedAt time.Time `json:"created_at"`
+}

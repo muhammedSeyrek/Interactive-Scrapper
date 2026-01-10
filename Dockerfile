@@ -14,6 +14,8 @@ FROM alpine:latest
 
 WORKDIR /root/
 
+RUN apk add --no-cache chromium ca-certificates
+
 COPY --from=builder /app/interactive-scraper .
 COPY --from=builder /app/templates ./templates
 

@@ -6,10 +6,13 @@ import (
 	"interactive-scraper/database"
 	"interactive-scraper/models"
 	"interactive-scraper/scraper"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"strconv"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -24,6 +27,7 @@ type LoginData struct {
 // DashboardStats holds statistics for the dashboard
 type PageData struct {
 	Contents []models.DarkWebContent
+	Targets  []models.Target
 	Stats    DashboardStats
 }
 
@@ -34,17 +38,29 @@ type DashboardStats struct {
 	LowRisk    int
 }
 
+type Config struct {
+	Targets []string `yaml:"targets"`
+}
+
 func main() {
 
 	database.InitDB()
 
+	loadTargetsFromYAML()
+
+	//go startBackgroundScrapping()
+
 	go func() {
+		time.Sleep(20 * time.Second)
 		contents, _ := database.GetAllContent()
 		if len(contents) == 0 {
 			fmt.Println("Database is empty, starting initial scrape...")
-			data, err := scraper.ScrapeURL("https://ibm.com") // Replace with actual URL
+			url := "http://check.torproject.org" // Replace with actual .onion URL
+			data, err := scraper.ScrapeURL(url)
 			if err == nil {
 				database.SaveDarkWebContent(data)
+			} else {
+				fmt.Println("Initial scrape failed: ", err)
 			}
 		}
 	}()
@@ -52,12 +68,126 @@ func main() {
 	http.HandleFunc("/login", LoginHandler)
 	http.HandleFunc("/logout", logoutHandler)
 	http.HandleFunc("/view", authMiddleware(viewHandler))
+	http.HandleFunc("/add-target", authMiddleware(addTargetHandler))
+	http.HandleFunc("/delete-target", authMiddleware(deleteTargetHandler))
+	http.HandleFunc("/targets", authMiddleware(targetsHandler))
+	http.HandleFunc("/scan-now", authMiddleware(scanNowHandler))
 	http.HandleFunc("/", authMiddleware(dashboardHandler))
 
 	port := ":8080"
 	fmt.Printf("Starting server on port: http://localhost%s\n", port)
 	log.Fatal(http.ListenAndServe(port, nil))
 
+}
+
+func loadTargetsFromYAML() {
+
+	file, err := ioutil.ReadFile("targets.yaml")
+	if err != nil {
+		fmt.Println("Targets.yaml is founded")
+		return
+	}
+
+	var config Config
+	if err := yaml.Unmarshal(file, &config); err != nil {
+		fmt.Println("YAML Format error:", err)
+		return
+	}
+
+	count := 0
+	for _, url := range config.Targets {
+		if url != "" {
+			err := database.AddTarget(url, "yaml")
+			if err == nil {
+				count++
+			}
+		}
+	}
+	fmt.Printf("Target %d was loaded/updated from the YAML file.\n", count)
+}
+
+func scanNowHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		targetID, _ := strconv.Atoi(r.FormValue("id"))
+		target, err := database.GetTargetByID(targetID)
+		if err != nil {
+			fmt.Println("Target isn't found:", err)
+			http.Redirect(w, r, "/targets", http.StatusSeeOther)
+			return
+		}
+		fmt.Println("Manual scan is started:", target.URL)
+
+		go func(t models.Target) {
+			data, err := scraper.ScrapeURL(t.URL)
+			if err != nil {
+				database.SaveDarkWebContent(data)
+				fmt.Println("[%s] scan its done.\n", t.URL)
+			} else {
+				fmt.Println("[%s] scan its failed: %v\n", t.URL, err)
+			}
+		}(target)
+
+	}
+	http.Redirect(w, r, "/targets", http.StatusSeeOther)
+}
+
+func startBackgroundScrapping() {
+	fmt.Println("Tor service is started.... wait for 30 second...")
+	time.Sleep(30 * time.Second)
+
+	for {
+		targets, err := database.GetAllContent()
+		if err != nil {
+			fmt.Println("Targets were not achieved:", err)
+			time.Sleep(1 * time.Minute)
+			continue
+		}
+		if len(targets) == 0 {
+			fmt.Println("No targets to scan. Wait for 1 minute...")
+			continue
+		}
+
+		fmt.Println("%d number of targets are being scanned...\n", len(targets))
+
+		for _, t := range targets {
+			fmt.Println("Scanning: %s [%s]\n", t.SourceURL, t.SourceName)
+
+			data, err := scraper.ScrapeURL(t.SourceURL)
+			if err == nil {
+				database.SaveDarkWebContent(data)
+				fmt.Println("Recorded.")
+			} else {
+				fmt.Println("Scan failed: %v\n", err)
+			}
+
+			time.Sleep(15 * time.Second)
+		}
+
+		fmt.Println("Entire list was scan. 5 minute break...")
+
+	}
+}
+
+func addTargetHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		url := r.FormValue("url")
+		if len(url) > 0 {
+			database.AddTarget(url, "manual")
+			fmt.Println("New target added:", url)
+		}
+	}
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+func deleteTargetHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		idStr := r.FormValue("id")
+		id, _ := strconv.Atoi(idStr)
+
+		database.DeleteTarget(id)
+		fmt.Println("Target deleted ID:", id)
+	}
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func viewHandler(w http.ResponseWriter, r *http.Request) {
@@ -172,6 +302,9 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 func dashboardHandler(w http.ResponseWriter, r *http.Request) {
 	// Fetch all content from the database
 	contents, err := database.GetAllContent()
+
+	targets, _ := database.GetAllTargets()
+
 	if err != nil {
 		http.Error(w, "Failed to load content: "+err.Error(), http.StatusInternalServerError)
 	}
@@ -192,6 +325,7 @@ func dashboardHandler(w http.ResponseWriter, r *http.Request) {
 
 	data := PageData{
 		Contents: contents,
+		Targets:  targets,
 		Stats:    stats,
 	}
 
@@ -204,4 +338,27 @@ func dashboardHandler(w http.ResponseWriter, r *http.Request) {
 
 	tmpl.Execute(w, data)
 
+}
+
+func targetsHandler(w http.ResponseWriter, r *http.Request) {
+
+	targets, err := database.GetAllTargets()
+	if err != nil {
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	// Veriyi sayfaya gönder
+	data := struct {
+		Targets []models.Target
+	}{
+		Targets: targets,
+	}
+
+	tmpl, err := template.ParseFiles("templates/targets.html")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	tmpl.Execute(w, data)
 }

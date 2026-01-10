@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Targets - DarkWatch CTI</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <style>
+        /* DASHBOARD İLE AYNI STİLLER */
+        :root {
+            --bg-dark: #12141c; --bg-panel: #1b1e2b; --text-main: #e0e6ed; --text-muted: #8c9cad;
+            --accent-blue: #0f62fe; --border-color: #393939; --critical-high: #fa4d56;
+        }
+        body { margin: 0; font-family: 'IBM Plex Mono', monospace; background-color: var(--bg-dark); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; font-size: 14px; }
+        .sidebar { width: 240px; background-color: #0b0d12; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; padding: 20px; }
+        .brand { font-size: 16px; font-weight: 600; color: var(--text-main); margin-bottom: 40px; letter-spacing: 1px; } .brand span { color: var(--accent-blue); }
+        
+        .menu-item { padding: 10px 15px; margin-bottom: 5px; color: var(--text-muted); text-decoration: none; transition: all 0.2s; border-left: 3px solid transparent; display: block; }
+        .menu-item:hover, .menu-item.active { background-color: rgba(255, 255, 255, 0.05); color: var(--text-main); border-left: 3px solid var(--accent-blue); }
+
+        .main-content { flex: 1; padding: 20px 40px; overflow-y: auto; }
+        .header { display: flex; justify-content: space-between; align-items: end; margin-bottom: 30px; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; }
+        .header h2 { margin: 0; font-weight: 500; font-size: 24px; }
+
+        /* Form Stilleri */
+        .add-panel { background: var(--bg-panel); padding: 20px; border: 1px solid var(--border-color); margin-bottom: 30px; display: flex; gap: 10px; }
+        input[type="text"] { flex: 1; background: var(--bg-dark); border: 1px solid var(--border-color); color: white; padding: 10px; font-family: 'IBM Plex Mono'; }
+        input:focus { outline: 1px solid var(--accent-blue); }
+        button { cursor: pointer; font-family: 'IBM Plex Mono'; font-weight: 600; padding: 0 20px; border: none; transition: 0.2s; }
+        .btn-add { background: var(--accent-blue); color: white; }
+        .btn-add:hover { background: #0043ce; }
+
+        /* Tablo Stilleri */
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid var(--border-color); }
+        th { color: var(--text-muted); font-size: 12px; }
+        tr:hover { background: rgba(255,255,255,0.02); }
+
+        .btn-scan { background: transparent; border: 1px solid var(--accent-blue); color: var(--accent-blue); padding: 6px 12px; cursor: pointer; }
+        .btn-scan:hover { background: var(--accent-blue); color: white; }
+        .btn-del { background: transparent; border: 1px solid var(--critical-high); color: var(--critical-high); padding: 6px 12px; margin-left: 5px; cursor: pointer; }
+        .btn-del:hover { background: var(--critical-high); color: white; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="brand"><span>//</span> DARK_WATCH</div>
+        <a href="/" class="menu-item">DASHBOARD</a>
+        <a href="/targets" class="menu-item active">TARGETS / ASSETS</a> <a href="#" class="menu-item">THREAT_FEED</a>
+        
+        <div style="margin-top: auto;">
+            <a href="/logout" class="menu-item" style="color: var(--critical-high); border-left: 3px solid transparent;">LOGOUT_SESSION</a>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <div>
+                <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">ASSET MANAGEMENT</div>
+                <h2>TARGET CONFIGURATION</h2>
+            </div>
+            <div style="text-align: right;">
+                <div style="font-size: 11px; color: var(--text-muted);">SYSTEM STATUS</div>
+                <div style="color: var(--critical-low); font-weight: 600;">● OPERATIONAL</div>
+            </div>
+        </div>
+
+        <form action="/add-target" method="POST" class="add-panel">
+            <input type="text" name="url" placeholder="Enter .onion URL (e.g. http://example.onion)" required>
+            <button type="submit" class="btn-add">ADD TARGET</button>
+        </form>
+
+        <div style="border: 1px solid var(--border-color);">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>TARGET URL</th>
+                        <th>SOURCE</th>
+                        <th>ADDED DATE</th>
+                        <th style="text-align: right;">ACTIONS</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ range .Targets }}
+                    <tr>
+                        <td style="color: var(--text-muted);">{{ .ID }}</td>
+                        <td style="font-family: monospace;">{{ .URL }}</td>
+                        <td>
+                            <span style="background: rgba(255,255,255,0.1); padding: 2px 6px; font-size: 10px;">{{ .Source }}</span>
+                        </td>
+                        <td>{{ .CreatedAt.Format "2006-01-02" }}</td>
+                        <td style="text-align: right;">
+                            <div style="display: flex; justify-content: flex-end;">
+                                <form action="/scan-now" method="POST" style="margin:0;">
+                                    <input type="hidden" name="id" value="{{ .ID }}">
+                                    <button type="submit" class="btn-scan">SCAN NOW</button>
+                                </form>
+                                <form action="/delete-target" method="POST" style="margin:0;">
+                                    <input type="hidden" name="id" value="{{ .ID }}">
+                                    <button type="submit" class="btn-del">DELETE</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {{ else }}
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 20px; color: var(--text-muted);">No targets found. Add one above.</td>
+                    </tr>
+                    {{ end }}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>
