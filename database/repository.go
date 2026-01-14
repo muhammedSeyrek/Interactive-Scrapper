@@ -5,6 +5,12 @@ import (
 	"log"
 )
 
+func UpdateTargetStatus(id int, status string) error {
+	query := `UPDATE targets SET last_status = $1, last_scanned_at = NOW() WHERE id = $2`
+	_, err := DB.Exec(query, status, id)
+	return err
+}
+
 func UpdateContent(id int, score int, category string) error {
 	query := `UPDATE dark_web_contents SET criticality_score = $1, category = $2 WHERE id = $3`
 	_, err := DB.Exec(query, score, category, id)
@@ -13,7 +19,7 @@ func UpdateContent(id int, score int, category string) error {
 
 func GetContentByID(id int) (*models.DarkWebContent, error) {
 	query := `
-    SELECT id, source_name, source_url, content, title, published_date, criticality_score, category 
+    SELECT id, source_name, source_url, content, title, published_date, criticality_score, category, matches, COALESCE(screenshot, '')
     FROM dark_web_contents 
     WHERE id = $1`
 
@@ -21,7 +27,7 @@ func GetContentByID(id int) (*models.DarkWebContent, error) {
 
 	// Execute the query
 	err := DB.QueryRow(query, id).Scan(&c.ID, &c.SourceName, &c.SourceURL, &c.Content, &c.Title,
-		&c.PublishedDate, &c.CriticalityScore, &c.Category,
+		&c.PublishedDate, &c.CriticalityScore, &c.Category, &c.Matches, &c.Screenshot,
 	)
 
 	if err != nil {
@@ -34,8 +40,8 @@ func GetContentByID(id int) (*models.DarkWebContent, error) {
 
 func SaveDarkWebContent(data *models.DarkWebContent) error {
 	query := `
-	INSERT INTO dark_web_contents (source_name, source_url, content, title, published_date, criticality_score, category)
-	VALUES ($1, $2, $3, $4, $5, $6, $7)
+    INSERT INTO dark_web_contents (source_name, source_url, content, title, published_date, criticality_score, category, matches, screenshot)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	RETURNING id`
 
 	err := DB.QueryRow(query,
@@ -46,6 +52,8 @@ func SaveDarkWebContent(data *models.DarkWebContent) error {
 		data.PublishedDate,
 		data.CriticalityScore,
 		data.Category,
+		data.Matches,
+		data.Screenshot,
 	).Scan(&data.ID)
 
 	if err != nil {
@@ -54,16 +62,16 @@ func SaveDarkWebContent(data *models.DarkWebContent) error {
 	}
 
 	log.Printf("DarkWebContent saved with ID: %d", data.ID)
-
 	return nil
 
 }
 
 func GetAllContent() ([]models.DarkWebContent, error) {
+
 	query := `
-	SELECT id, source_name, source_url, content, title, published_date, criticality_score, category 
-	FROM dark_web_contents 
-	ORDER BY published_date DESC`
+    SELECT id, source_name, source_url, content, title, published_date, criticality_score, category 
+    FROM dark_web_contents 
+    ORDER BY published_date DESC`
 
 	rows, err := DB.Query(query)
 	if err != nil {
@@ -86,7 +94,7 @@ func GetAllContent() ([]models.DarkWebContent, error) {
 }
 
 func AddTarget(url string, source string) error {
-	query := `INSERT INTO targets (url, source) VALUES ($1, $2) ON CONFLICT (url) DO NOTHING`
+	query := `INSERT INTO targets (url, source, last_status) VALUES ($1, $2, 'Pending') ON CONFLICT (url) DO NOTHING`
 	_, err := DB.Exec(query, url, source)
 	return err
 }
@@ -98,15 +106,21 @@ func DeleteTarget(id int) error {
 }
 
 func GetTargetByID(id int) (models.Target, error) {
-	query := `SELECT id, url, source, created_at FROM targets WHERE id = $1`
+	query := `
+    SELECT id, url, source, created_at, COALESCE(last_status, 'Pending'), COALESCE(last_scanned_at, created_at)
+    FROM targets WHERE id = $1`
+
 	var t models.Target
-	err := DB.QueryRow(query, id).Scan(&t.ID, &t.URL, &t.Source, &t.CreatedAt)
+	err := DB.QueryRow(query, id).Scan(&t.ID, &t.URL, &t.Source, &t.CreatedAt, &t.LastStatus, &t.LastScannedAt)
 	return t, err
 }
 
 func GetAllTargets() ([]models.Target, error) {
 
-	query := `SELECT id, url, source, created_at FROM targets ORDER BY created_at DESC`
+	query := `
+    SELECT id, url, source, created_at, COALESCE(last_status, 'Pending'), COALESCE(last_scanned_at, created_at)
+    FROM targets 
+    ORDER BY created_at DESC`
 
 	rows, err := DB.Query(query)
 
@@ -118,7 +132,7 @@ func GetAllTargets() ([]models.Target, error) {
 	var targets []models.Target
 	for rows.Next() {
 		var t models.Target
-		if err := rows.Scan(&t.ID, &t.URL, &t.Source, &t.CreatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.URL, &t.Source, &t.CreatedAt, &t.LastStatus, &t.LastScannedAt); err != nil {
 			return nil, err
 		}
 		targets = append(targets, t)

@@ -2,155 +2,169 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Intel Analysis | {{ .Title }}</title>
+    <title>Analysis Report #{{ .ID }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --bg-dark: #12141c;
-            --bg-panel: #1b1e2b;
-            --text-main: #e0e6ed;
-            --text-muted: #8c9cad;
-            --accent-blue: #0f62fe;
-            --border-color: #393939;
-        }
-
-        body {
-            background-color: var(--bg-dark);
-            color: var(--text-main);
-            font-family: 'IBM Plex Mono', monospace;
-            margin: 0;
-            padding: 20px;
-            height: 100vh;
-            box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .top-bar {
-            display: flex;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .back-btn {
-            text-decoration: none;
-            color: var(--accent-blue);
-            font-weight: 600;
-            font-size: 14px;
-        }
-        .back-btn:hover { text-decoration: underline; }
-
-        .analysis-grid {
-            display: grid;
-            grid-template-columns: 350px 1fr;
-            gap: 20px;
-            height: 100%;
-            overflow: hidden;
-        }
-
-        .panel {
-            background-color: var(--bg-panel);
-            border: 1px solid var(--border-color);
-            padding: 20px;
-            overflow-y: auto;
-        }
-
-        .meta-group { margin-bottom: 20px; }
-        .meta-label { color: var(--text-muted); font-size: 11px; display: block; margin-bottom: 5px; }
+        :root { --bg-dark: #12141c; --bg-panel: #1b1e2b; --text: #e0e6ed; --border: #393939; --accent: #0f62fe; --high: #fa4d56; }
         
-        input, select {
-            background-color: var(--bg-dark);
-            border: 1px solid var(--border-color);
-            color: white;
-            padding: 10px;
-            width: 100%;
-            font-family: 'IBM Plex Mono', monospace;
-            box-sizing: border-box;
-        }
-
-        .btn-save {
-            background-color: var(--accent-blue);
-            color: white;
-            border: none;
-            width: 100%;
-            padding: 12px;
-            cursor: pointer;
-            margin-top: 10px;
+        * { box-sizing: border-box; } /* Taşmaları önlemek için kritik */
+        
+        body { 
+            background: var(--bg-dark); 
+            color: var(--text); 
             font-family: 'IBM Plex Mono', monospace; 
-        }
-        .btn-action {
-            display: inline-block;       /* Linkin buton gibi davranması için şart */
-            background: transparent;
-            border: 1px solid var(--text-muted);
-            color: var(--text-muted);
-            padding: 6px 12px;           /* Biraz daha genişlettim */
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 11px;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-decoration: none;       /* Link alt çizgisini kaldırır */
-            text-align: center;
+            margin: 0; 
+            padding: 20px; 
+            overflow-x: hidden; /* Yatay scrollu engelle */
         }
 
-        .btn-action:hover {
-            border-color: var(--accent-blue); /* Üzerine gelince mavi çerçeve */
-            color: #fff;
-            background: rgba(15, 98, 254, 0.1); /* Hafif mavi dolgu */
+        .container { 
+            width: 100%; 
+            max-width: 1200px; 
+            margin: 0 auto; 
+        }
+        
+        /* BACK BUTTON - EN ÜSTTE */
+        .nav-bar { margin-bottom: 20px; }
+        .btn-back { 
+            color: var(--text); 
+            text-decoration: none; 
+            font-size: 13px; 
+            display: inline-flex; 
+            align-items: center; 
+            border: 1px solid var(--border); 
+            padding: 8px 15px;
+            background: var(--bg-panel);
+            transition: 0.2s;
+        }
+        .btn-back:hover { border-color: var(--accent); color: var(--accent); }
+
+        .header { 
+            border-bottom: 1px solid var(--border); 
+            padding-bottom: 20px; 
+            margin-bottom: 30px; 
+            display: flex; 
+            flex-wrap: wrap; 
+            justify-content: space-between; 
+            align-items: center; 
+            gap: 15px; 
+        }
+        
+        h1 { margin: 0; font-size: 20px; word-break: break-word; line-height: 1.4; }
+        
+        .badge { padding: 6px 12px; background: var(--border); font-size: 12px; white-space: nowrap; }
+        .high { background: rgba(250, 77, 86, 0.2); color: var(--high); border: 1px solid var(--high); }
+        
+        .grid { 
+            display: grid; 
+            grid-template-columns: 1fr 1.5fr; /* Sağ taraf biraz daha geniş */
+            gap: 30px; 
+        }
+        
+        .panel { background: var(--bg-panel); border: 1px solid var(--border); padding: 20px; margin-bottom: 20px; overflow: hidden; }
+        .panel h3 { margin-top: 0; color: var(--accent); font-size: 13px; text-transform: uppercase; border-bottom: 1px solid var(--border); padding-bottom: 10px; letter-spacing: 1px; }
+        
+        .screenshot-container { 
+            width: 100%; 
+            min-height: 200px; 
+            background: #000; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            border: 1px solid var(--border); 
+        }
+        img { max-width: 100%; height: auto; display: block; }
+        
+        /* RAW CONTENT - Scroll sorununu çözen ayarlar */
+        pre { 
+            white-space: pre-wrap;       /* Satırları kır */
+            word-break: break-all;       /* Uzun kelimeleri zorla kır */
+            font-size: 11px; 
+            color: #8c9cad; 
+            max-height: 500px; 
+            overflow-y: auto; 
+            background: rgba(0,0,0,0.3); 
+            padding: 15px; 
+            border: 1px solid var(--border);
         }
 
-        .content-area {
-            white-space: pre-wrap;
-            line-height: 1.5;
-            color: #ccc;
+        .meta-row { margin-bottom: 10px; font-size: 13px; }
+        .meta-label { color: #8c9cad; display: inline-block; width: 80px; }
+        .meta-val { color: var(--text); word-break: break-all; }
+
+        @media (max-width: 900px) {
+            .grid { grid-template-columns: 1fr; } /* Mobilde tek kolon */
+            body { padding: 15px; }
+            h1 { font-size: 18px; }
         }
     </style>
 </head>
 <body>
-
-    <div class="top-bar">
-        <a href="/" class="back-btn">< BACK_TO_DASHBOARD</a>
-        <div style="margin-left: 20px; color: var(--text-muted);">// ANALYZE_ID: {{ .ID }}</div>
-    </div>
-
-    <div class="analysis-grid">
-        <div class="panel">
-            <h3 style="margin-top:0; color: var(--accent-blue);">METADATA</h3>
-            
-            <div class="meta-group">
-                <span class="meta-label">SOURCE</span>
-                <div>{{ .SourceName }}</div>
-            </div>
-
-            <div class="meta-group">
-                <span class="meta-label">DATE</span>
-                <div>{{ .PublishedDate.Format "02 Jan 2006 15:04" }}</div>
-            </div>
-
-            <hr style="border-color: var(--border-color); opacity: 0.3;">
-
-            <form action="/view?id={{ .ID }}" method="POST">
-                <div class="meta-group">
-                    <span class="meta-label">CATEGORY</span>
-                    <input type="text" name="category" value="{{ .Category }}">
-                </div>
-
-                <div class="meta-group">
-                    <span class="meta-label">RISK SCORE (1-10)</span>
-                    <input type="number" name="score" min="1" max="10" value="{{ .CriticalityScore }}">
-                </div>
-
-                <button type="submit" class="btn-save">UPDATE INTEL</button>
-            </form>
+    <div class="container">
+        
+        <div class="nav-bar">
+            <a href="/" class="btn-back">&larr; BACK TO DASHBOARD</a>
         </div>
 
-        <div class="panel">
-            <span class="meta-label">CAPTURED CONTENT</span>
-            <h2 style="margin-top: 5px;">{{ .Title }}</h2>
-            <div class="content-area">{{ .Content }}</div>
+        <div class="header">
+            <div style="flex: 1;">
+                <div style="font-size: 11px; color: #8c9cad; margin-bottom: 5px;">REPORT ID: #{{ .ID }}</div>
+                <h1>{{ .Title }}</h1>
+            </div>
+            <div>
+                <span class="badge {{ if ge .CriticalityScore 7 }}high{{ end }}">RISK SCORE: {{ .CriticalityScore }}/10</span>
+            </div>
+        </div>
+
+        <div class="grid">
+            <div class="left-col">
+                <div class="panel">
+                    <h3>Metadata</h3>
+                    <div class="meta-row">
+                        <span class="meta-label">URL:</span>
+                        <span class="meta-val"><a href="{{ .SourceURL }}" style="color:var(--accent); text-decoration:none;" target="_blank">{{ .SourceURL }}</a></span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">DATE:</span>
+                        <span class="meta-val">{{ .PublishedDate.Format "2006-01-02 15:04" }}</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">CAT:</span>
+                        <span class="meta-val">{{ .Category }}</span>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h3>Intelligence Findings</h3>
+                    <p style="color: #f1c21b; line-height: 1.6; word-break: break-word; font-size: 13px;">
+                        {{ if .Matches }}
+                            {{ .Matches }}
+                        {{ else }}
+                            <span style="color: #555;">No specific entities found.</span>
+                        {{ end }}
+                    </p>
+                </div>
+            </div>
+
+            <div class="right-col">
+                <div class="panel">
+                    <h3>Evidence (Screenshot)</h3>
+                    <div class="screenshot-container">
+                        {{ if .Screenshot }}
+                            <img src="data:image/png;base64,{{ .Screenshot }}" alt="Dark Web Screenshot">
+                        {{ else }}
+                            <span style="color: #555; font-size: 12px;">No Screenshot Available</span>
+                        {{ end }}
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h3>Raw Content Preview</h3>
+                    <pre>{{ .Content }}</pre>
+                </div>
+            </div>
         </div>
     </div>
-
 </body>
 </html>

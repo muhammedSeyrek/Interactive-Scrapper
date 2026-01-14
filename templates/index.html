@@ -3,341 +3,172 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CTI Threat Intelligence Platform</title>
-    
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <title>DarkWatch - Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
-        :root {
-            --bg-dark: #12141c;
-            --bg-panel: #1b1e2b;
-            --text-main: #e0e6ed;
-            --text-muted: #8c9cad;
-            --accent-blue: #0f62fe;
-            --border-color: #393939;
-            --critical-high: #fa4d56;
-            --critical-med: #f1c21b;
-            --critical-low: #42be65;
-        }
-
-        body {
-            margin: 0;
-            font-family: 'IBM Plex Mono', monospace;
-            background-color: var(--bg-dark);
-            color: var(--text-main);
-            display: flex;
-            height: 100vh;
-            overflow: hidden;
-            font-size: 14px;
-        }
-
-        .sidebar {
-            width: 240px;
-            background-color: #0b0d12;
-            border-right: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-            padding: 20px;
-        }
-
-        .btn-action {
-            display: inline-block;
-            background: transparent;
-            border: 1px solid var(--text-muted);
-            color: var(--text-muted);
-            padding: 6px 12px;
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 11px;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-decoration: none;
-            text-align: center;
-        }
-        .btn-action:hover {
-            border-color: var(--accent-blue);
-            color: #fff;
-            background: rgba(15, 98, 254, 0.1);
-        }
-
-        .btn-delete {
-            border-color: var(--critical-high);
-            color: var(--critical-high);
-        }
-        .btn-delete:hover {
-            background: rgba(250, 77, 86, 0.1);
-            color: #fff;
-        }
-
-        .brand {
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 40px;
-            letter-spacing: 1px;
-            color: var(--text-main);
-        }
-        .brand span { color: var(--accent-blue); }
-
-        .menu-item {
-            padding: 10px 15px;
-            margin-bottom: 5px;
-            color: var(--text-muted);
-            text-decoration: none;
-            transition: all 0.2s;
-            border-left: 3px solid transparent;
-        }
-        .menu-item:hover, .menu-item.active {
-            background-color: rgba(255, 255, 255, 0.05);
-            color: var(--text-main);
-            border-left: 3px solid var(--accent-blue);
-        }
-
-        .main-content {
-            flex: 1;
-            padding: 20px 40px;
-            overflow-y: auto;
-        }
-
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: end;
-            margin-bottom: 30px;
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 15px;
-        }
-        .header h2 { margin: 0; font-weight: 500; font-size: 24px; }
-
-        /* YENİ: Grid Layout 2 Satır */
-        .dashboard-layout {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .top-row {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 20px;
-        }
-
-        .stats-container {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-        }
-
-        .card {
-            background-color: var(--bg-panel);
-            border: 1px solid var(--border-color);
-            padding: 20px;
-            position: relative;
-        }
-        .card::before {
-            content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%;
-            background-color: var(--accent-blue);
-        }
-        .stat-title { color: var(--text-muted); font-size: 12px; margin-bottom: 10px; }
-        .stat-value { font-size: 32px; font-weight: 300; }
-
-        .chart-card {
-            background-color: var(--bg-panel);
-            border: 1px solid var(--border-color);
-            padding: 15px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 140px;
-        }
-
-        /* YENİ: Target Management Paneli */
-        .targets-panel {
-            background-color: var(--bg-panel);
-            border: 1px solid var(--border-color);
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-
-        .target-form {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
+        :root { --bg-dark: #12141c; --bg-panel: #1b1e2b; --text-main: #e0e6ed; --text-muted: #8c9cad; --accent-blue: #0f62fe; --border: #393939; --high: #fa4d56; --med: #f1c21b; --low: #42be65; }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: 'IBM Plex Mono', monospace; background: var(--bg-dark); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; font-size: 13px; }
         
-        input[type="text"] {
-            background: var(--bg-dark);
-            border: 1px solid var(--border-color);
-            color: var(--text-main);
-            padding: 8px 12px;
-            font-family: 'IBM Plex Mono';
-            flex: 1;
-        }
+        /* SIDEBAR */
+        .sidebar { width: 240px; background: #0b0d12; border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px; flex-shrink: 0; transition: all 0.3s; }
+        .brand { font-size: 16px; font-weight: 600; margin-bottom: 40px; letter-spacing: 1px; } .brand span { color: var(--accent-blue); }
+        .menu-item { padding: 12px 15px; margin-bottom: 5px; color: var(--text-muted); text-decoration: none; border-left: 3px solid transparent; display: block; }
+        .menu-item:hover, .menu-item.active { background: rgba(255,255,255,0.05); color: #fff; border-left-color: var(--accent-blue); }
+        .logout { margin-top: auto; color: var(--high); }
+
+        /* MAIN CONTENT */
+        .main-content { flex: 1; padding: 30px; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 1px solid var(--border); padding-bottom: 15px; margin-bottom: 10px; }
+        h2 { margin: 0; font-weight: 500; font-size: 22px; }
+        .status { color: var(--low); font-weight: 600; font-size: 11px; }
+
+        /* DASHBOARD GRID */
+        .top-row { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+        
+        .card { background: var(--bg-panel); border: 1px solid var(--border); padding: 20px; position: relative; }
+        .card::before { content: ''; position: absolute; top: 0; left: 0; width: 3px; height: 100%; background: var(--accent-blue); }
+        .card.risk-high::before { background: var(--high); }
+        
+        .stat-title { color: var(--text-muted); font-size: 11px; margin-bottom: 5px; text-transform: uppercase; }
+        .stat-value { font-size: 28px; font-weight: 300; }
+
+        /* TARGETS PANEL */
+        .add-target-form { display: flex; gap: 10px; margin-bottom: 15px; }
+        input[type="text"] { flex: 1; background: #000; border: 1px solid var(--border); color: #fff; padding: 10px; font-family: inherit; }
         input:focus { outline: 1px solid var(--accent-blue); }
-
-        .target-list {
-            max-height: 150px;
-            overflow-y: auto;
-            border: 1px solid var(--border-color);
-        }
-
-        .target-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 15px;
-            border-bottom: 1px solid var(--border-color);
-            background: rgba(255,255,255,0.01);
-        }
+        .btn { background: var(--accent-blue); color: #fff; border: none; padding: 0 20px; cursor: pointer; font-weight: 600; font-family: inherit; transition: 0.2s; }
+        .btn:hover { opacity: 0.9; }
+        
+        .target-list { max-height: 200px; overflow-y: auto; border: 1px solid var(--border); }
+        .target-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid var(--border); background: rgba(255,255,255,0.02); }
         .target-item:last-child { border-bottom: none; }
-        .target-source { font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-right: 10px; }
+        .btn-del { background: transparent; color: var(--high); border: 1px solid var(--high); padding: 4px 8px; font-size: 10px; cursor: pointer; }
+        .btn-del:hover { background: var(--high); color: #fff; }
 
-        .table-header { font-size: 16px; margin-bottom: 15px; font-weight: 500; margin-top: 20px; }
-        .table-container { border: 1px solid var(--border-color); }
-        table { width: 100%; border-collapse: collapse; }
-        thead { background-color: rgba(255,255,255,0.03); }
-        th, td { padding: 12px 20px; text-align: left; border-bottom: 1px solid var(--border-color); }
-        th { color: var(--text-muted); font-weight: 500; font-size: 12px; }
-        td { font-weight: 300; }
-        .badge { padding: 2px 8px; font-size: 11px; border: 1px solid transparent; }
-        .badge-high { color: var(--critical-high); border-color: var(--critical-high); background: rgba(250, 77, 86, 0.1); }
-        .badge-med { color: var(--critical-med); border-color: var(--critical-med); background: rgba(241, 194, 27, 0.1); }
-        .badge-low { color: var(--critical-low); border-color: var(--critical-low); background: rgba(66, 190, 101, 0.1); }
-        .source-link { color: var(--accent-blue); text-decoration: none; }
+        /* TABLES */
+        .table-responsive { overflow-x: auto; border: 1px solid var(--border); }
+        table { width: 100%; border-collapse: collapse; min-width: 800px; } /* Min-width ensures scrolling on mobile */
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: rgba(255,255,255,0.03); color: var(--text-muted); font-size: 11px; font-weight: 500; }
+        
+        .badge { padding: 3px 8px; font-size: 10px; border: 1px solid transparent; }
+        .badge.high { color: var(--high); background: rgba(250, 77, 86, 0.1); border-color: var(--high); }
+        .badge.med { color: var(--med); background: rgba(241, 194, 27, 0.1); border-color: var(--med); }
+        .badge.low { color: var(--low); background: rgba(66, 190, 101, 0.1); border-color: var(--low); }
+        
+        .btn-analyze { color: var(--accent-blue); border: 1px solid var(--accent-blue); text-decoration: none; padding: 4px 10px; font-size: 10px; display: inline-block; transition: 0.2s; }
+        .btn-analyze:hover { background: var(--accent-blue); color: #fff; }
+
+        /* RESPONSIVE MEDIA QUERIES */
+        @media (max-width: 900px) {
+            body { flex-direction: column; height: auto; overflow: auto; }
+            .sidebar { width: 100%; height: auto; flex-direction: row; overflow-x: auto; align-items: center; justify-content: space-between; padding: 10px 20px; }
+            .sidebar .menu-item { border-left: none; border-bottom: 2px solid transparent; padding: 10px; }
+            .sidebar .menu-item.active { border-bottom-color: var(--accent-blue); background: transparent; }
+            .brand { margin-bottom: 0; margin-right: 20px; }
+            
+            .top-row { grid-template-columns: 1fr; }
+            .stats-grid { grid-template-columns: 1fr; }
+            .chart-card { height: 200px; }
+        }
     </style>
 </head>
 <body>
 
     <div class="sidebar">
         <div class="brand"><span>//</span> DARK_WATCH</div>
-        
-        <a href="/" class="menu-item active">DASHBOARD</a>
-
-        <a href="/targets" class="menu-item">TARGETS / ASSETS</a>
-        <a href="#" class="menu-item">THREAT_FEED</a>
-        
-        <div style="margin-top: auto;">
-            <a href="/logout" class="menu-item" style="color: var(--critical-high);">LOGOUT_SESSION</a>
+        <div style="display:flex; gap:10px;"> <a href="/" class="menu-item active">DASHBOARD</a>
+            <a href="/targets" class="menu-item">TARGETS</a>
         </div>
+        <a href="/logout" class="menu-item logout">LOGOUT</a>
     </div>
 
     <div class="main-content">
         <div class="header">
             <div>
-                <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">WORKSPACE / MAIN</div>
-                <h2>THREAT_INTELLIGENCE</h2>
+                <div style="font-size: 11px; color: var(--text-muted);">WORKSPACE / MAIN</div>
+                <h2>THREAT INTELLIGENCE</h2>
             </div>
-            <div style="text-align: right;">
-                <div style="font-size: 11px; color: var(--text-muted);">SYSTEM STATUS</div>
-                <div style="color: var(--critical-low); font-weight: 600;">● OPERATIONAL</div>
+            <div class="status">● OPERATIONAL</div>
+        </div>
+
+        <div class="top-row">
+            <div class="stats-grid">
+                <div class="card">
+                    <div class="stat-title">TOTAL INDICATORS</div>
+                    <div class="stat-value">{{ .Stats.Total }}</div>
+                </div>
+                <div class="card risk-high">
+                    <div class="stat-title">HIGH RISK</div>
+                    <div class="stat-value" style="color: var(--high);">{{ .Stats.HighRisk }}</div>
+                </div>
+                <div class="card">
+                    <div class="stat-title">AVG. SEVERITY</div>
+                    <div class="stat-value">5.0</div>
+                </div>
+            </div>
+            <div class="card" style="display: flex; align-items: center; justify-content: center; height: 160px;">
+                <canvas id="riskChart"></canvas>
             </div>
         </div>
 
-        <div class="dashboard-layout">
-            
-            <div class="top-row">
-                <div class="stats-container">
-                    <div class="card">
-                        <div class="stat-title">TOTAL INDICATORS</div>
-                        <div class="stat-value">{{ .Stats.Total }}</div>
-                    </div>
-                    <div class="card" style="border-left: 4px solid var(--critical-high);">
-                        <div class="stat-title">HIGH RISK</div>
-                        <div class="stat-value" style="color: var(--critical-high);">{{ .Stats.HighRisk }}</div>
-                    </div>
-                    <div class="card">
-                        <div class="stat-title">AVG. SEVERITY</div>
-                        <div class="stat-value">5.0</div>
-                    </div>
-                </div>
-
-                <div class="chart-card">
-                    <canvas id="riskChart"></canvas>
-                </div>
+        <div>
+            <div class="stat-title" style="margin-bottom: 10px;">> LATEST INTERCEPTIONS</div>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th width="5%">ID</th>
+                            <th width="15%">TIMESTAMP</th>
+                            <th width="20%">TITLE</th>
+                            <th width="20%">SOURCE</th>
+                            <th width="10%">RISK</th>
+                            <th width="20%">INTELLIGENCE</th>
+                            <th width="10%" style="text-align: right;">ACTION</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{ range .Contents }}
+                        <tr>
+                            <td style="color: var(--text-muted);">{{ .ID }}</td>
+                            <td>{{ .PublishedDate.Format "01-02 15:04" }}</td>
+                            <td style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;">{{ .Title }}</td>
+                            <td style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;">
+                                <a href="{{ .SourceURL }}" style="color: var(--accent-blue); text-decoration: none;" target="_blank">{{ .SourceName }}</a>
+                            </td>
+                            <td>
+                                {{ if ge .CriticalityScore 7 }} <span class="badge high">HIGH: {{ .CriticalityScore }}</span>
+                                {{ else if ge .CriticalityScore 4 }} <span class="badge med">MED: {{ .CriticalityScore }}</span>
+                                {{ else }} <span class="badge low">LOW: {{ .CriticalityScore }}</span> {{ end }}
+                            </td>
+                            <td style="font-size: 11px; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                {{ if .Matches }} <span style="color: var(--accent-blue);">{{ .Matches }}</span>
+                                {{ else }} <span style="color: var(--text-muted);">-</span> {{ end }}
+                            </td>
+                            <td style="text-align: right;">
+                                <a href="/view?id={{ .ID }}" class="btn-analyze">ANALYZE</a>
+                            </td>
+                        </tr>
+                        {{ end }}
+                    </tbody>
+                </table>
             </div>
-
-            <div class="targets-panel">
-                <h3 style="margin-top:0; color: var(--accent-blue); font-size: 14px;">TARGET MANAGEMENT</h3>
-                
-                <form action="/add-target" method="POST" class="target-form">
-                    <input type="text" name="url" placeholder="Add new .onion URL (e.g. http://example.onion)" required>
-                    <button type="submit" class="btn-action" style="background: var(--accent-blue); color: white; border: none;">ADD TARGET</button>
-                </form>
-
-                <div class="target-list">
-                    {{ range .Targets }}
-                    <div class="target-item">
-                        <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70%;">
-                            <span class="target-source">[{{ .Source }}]</span>
-                            {{ .URL }}
-                        </div>
-                        <form action="/delete-target" method="POST" style="margin:0;">
-                            <input type="hidden" name="id" value="{{ .ID }}">
-                            <button type="submit" class="btn-action btn-delete">DELETE</button>
-                        </form>
-                    </div>
-                    {{ else }}
-                    <div style="padding: 15px; color: var(--text-muted); text-align: center;">No targets configured.</div>
-                    {{ end }}
-                </div>
-            </div>
-
-            <div>
-                <div class="table-header">> LATEST_INTERCEPTIONS</div>
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>TIMESTAMP</th>
-                                <th>TITLE</th>
-                                <th>SOURCE</th>
-                                <th>RISK_SCORE</th>
-                                <th>ACTION</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {{ range .Contents }}
-                            <tr>
-                                <td style="color: var(--text-muted);">{{ .ID }}</td>
-                                <td>{{ .PublishedDate.Format "2006-01-02 15:04" }}</td>
-                                <td>{{ .Title }}</td>
-                                <td><a href="{{ .SourceURL }}" class="source-link" target="_blank">{{ .SourceName }}</a></td>
-                                <td>
-                                    {{ if ge .CriticalityScore 7 }}
-                                        <span class="badge badge-high">HIGH: {{ .CriticalityScore }}</span>
-                                    {{ else if ge .CriticalityScore 4 }}
-                                        <span class="badge badge-med">MED: {{ .CriticalityScore }}</span>
-                                    {{ else }}
-                                        <span class="badge badge-low">LOW: {{ .CriticalityScore }}</span>
-                                    {{ end }}
-                                </td>
-                                <td>
-                                    <a href="/view?id={{ .ID }}" class="btn-action">ANALYZE</a>
-                                </td>
-                            </tr>
-                            {{ end }}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
         </div>
+
     </div>
 
     <script>
-        const highRisk = {{ .Stats.HighRisk }};
-        const medRisk = {{ .Stats.MediumRisk }};
-        const lowRisk = {{ .Stats.LowRisk }};
-
         const ctx = document.getElementById('riskChart').getContext('2d');
         new Chart(ctx, {
             type: 'doughnut',
             data: {
-                labels: ['High', 'Medium', 'Low'],
+                labels: ['High', 'Med', 'Low'],
                 datasets: [{
-                    data: [highRisk, medRisk, lowRisk],
+                    data: [{{ .Stats.HighRisk }}, {{ .Stats.MediumRisk }}, {{ .Stats.LowRisk }}],
                     backgroundColor: ['#fa4d56', '#f1c21b', '#42be65'],
                     borderWidth: 0
                 }]
@@ -345,9 +176,7 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'right', labels: { color: '#8c9cad', font: { family: 'IBM Plex Mono' } } }
-                }
+                plugins: { legend: { position: 'right', labels: { color: '#8c9cad', font: { family: 'IBM Plex Mono' } } } }
             }
         });
     </script>

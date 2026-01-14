@@ -65,6 +65,8 @@ func createTables() {
 			id SERIAL PRIMARY KEY,
 			url TEXT NOT NULL UNIQUE, 
 			source VARCHAR(50) DEFAULT 'manual',
+			last_status VARCHAR(50) DEFAULT 'Pending',
+            last_scanned_at TIMESTAMP,                  
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		);`
 

@@ -73,6 +73,7 @@ func main() {
 	http.HandleFunc("/targets", authMiddleware(targetsHandler))
 	http.HandleFunc("/scan-now", authMiddleware(scanNowHandler))
 	http.HandleFunc("/", authMiddleware(dashboardHandler))
+	http.HandleFunc("/deep-scan", authMiddleware(deepScanHandler))
 
 	port := ":8080"
 	fmt.Printf("Starting server on port: http://localhost%s\n", port)
@@ -115,15 +116,26 @@ func scanNowHandler(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/targets", http.StatusSeeOther)
 			return
 		}
+
+		fmt.Printf("Debug is started: %s", target.URL)
+		err = database.UpdateTargetStatus(target.ID, "Scanning...")
+		if err != nil {
+			log.Printf("DB state error to update: %v", err)
+		}
+
 		fmt.Println("Manual scan is started:", target.URL)
+
+		database.UpdateTargetStatus(target.ID, "Scanning...")
 
 		go func(t models.Target) {
 			data, err := scraper.ScrapeURL(t.URL)
 			if err != nil {
-				database.SaveDarkWebContent(data)
-				fmt.Println("[%s] scan its done.\n", t.URL)
+				database.UpdateTargetStatus(t.ID, "Failed")
+				fmt.Println("[%s] scan its failed.\n", t.URL)
 			} else {
-				fmt.Println("[%s] scan its failed: %v\n", t.URL, err)
+				database.SaveDarkWebContent(data)
+				database.UpdateTargetStatus(t.ID, "Online")
+				fmt.Println("[%s] scan its done: %v\n", t.URL, err)
 			}
 		}(target)
 
@@ -133,10 +145,10 @@ func scanNowHandler(w http.ResponseWriter, r *http.Request) {
 
 func startBackgroundScrapping() {
 	fmt.Println("Tor service is started.... wait for 30 second...")
-	time.Sleep(30 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	for {
-		targets, err := database.GetAllContent()
+		targets, err := database.GetAllTargets()
 		if err != nil {
 			fmt.Println("Targets were not achieved:", err)
 			time.Sleep(1 * time.Minute)
@@ -150,21 +162,25 @@ func startBackgroundScrapping() {
 		fmt.Println("%d number of targets are being scanned...\n", len(targets))
 
 		for _, t := range targets {
-			fmt.Println("Scanning: %s [%s]\n", t.SourceURL, t.SourceName)
+			fmt.Println("Scanning: %s\n", t.URL)
 
-			data, err := scraper.ScrapeURL(t.SourceURL)
+			database.UpdateTargetStatus(t.ID, "Scanning...")
+
+			data, err := scraper.ScrapeURL(t.URL)
 			if err == nil {
 				database.SaveDarkWebContent(data)
+				database.UpdateTargetStatus(t.ID, "Online")
 				fmt.Println("Recorded.")
 			} else {
 				fmt.Println("Scan failed: %v\n", err)
+				database.UpdateTargetStatus(t.ID, "Failed")
 			}
 
 			time.Sleep(15 * time.Second)
 		}
 
 		fmt.Println("Entire list was scan. 5 minute break...")
-
+		time.Sleep(5 * time.Minute)
 	}
 }
 
@@ -176,7 +192,7 @@ func addTargetHandler(w http.ResponseWriter, r *http.Request) {
 			fmt.Println("New target added:", url)
 		}
 	}
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	http.Redirect(w, r, "/targets", http.StatusSeeOther)
 }
 
 func deleteTargetHandler(w http.ResponseWriter, r *http.Request) {
@@ -187,7 +203,7 @@ func deleteTargetHandler(w http.ResponseWriter, r *http.Request) {
 		database.DeleteTarget(id)
 		fmt.Println("Target deleted ID:", id)
 	}
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	http.Redirect(w, r, "/targets", http.StatusSeeOther)
 }
 
 func viewHandler(w http.ResponseWriter, r *http.Request) {
@@ -300,13 +316,16 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func dashboardHandler(w http.ResponseWriter, r *http.Request) {
-	// Fetch all content from the database
-	contents, err := database.GetAllContent()
 
 	targets, _ := database.GetAllTargets()
 
+	// Fetch all content from the database
+	contents, err := database.GetAllContent()
+
 	if err != nil {
-		http.Error(w, "Failed to load content: "+err.Error(), http.StatusInternalServerError)
+		log.Printf("Error getting content: %v", err)
+		http.Error(w, "Failed to load content", http.StatusInternalServerError)
+		return
 	}
 
 	stats := DashboardStats{
@@ -361,4 +380,56 @@ func targetsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	tmpl.Execute(w, data)
+}
+
+func deepScanHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		idStr := r.FormValue("id")
+		targetID, _ := strconv.Atoi(idStr)
+		target, err := database.GetTargetByID(targetID)
+
+		if err != nil {
+			http.Redirect(w, r, "/targets", http.StatusSeeOther)
+			return
+		}
+
+		fmt.Printf("[DEEP SCAN] Started for: %s\n", target.URL)
+		database.UpdateTargetStatus(target.ID, "Deep Scanning...")
+
+		go func(t models.Target) {
+			mainResult, err := scraper.ScrapeURL(t.URL)
+			if err != nil {
+				database.UpdateTargetStatus(t.ID, "Failed")
+				return
+			}
+			database.SaveDarkWebContent(mainResult)
+
+			links := scraper.ExtractOnionLinks(mainResult.Content, t.URL)
+
+			maxLinks := 5
+			if len(links) < maxLinks {
+				maxLinks = len(links)
+			}
+			subLinks := links[:maxLinks]
+
+			fmt.Printf("[DEEP SCAN] Found %d links. Scanning top %d...\n", len(links), len(subLinks))
+
+			for _, link := range subLinks {
+
+				fmt.Printf("   -> Spawning worker for: %s\n", link)
+
+				subResult, subErr := scraper.ScrapeURL(link)
+				if subErr == nil {
+					subResult.Title = "[SUB] " + subResult.Title
+					subResult.Category = subResult.Category + " (DeepScan)"
+					database.SaveDarkWebContent(subResult)
+				}
+			}
+
+			database.UpdateTargetStatus(t.ID, "Online (Deep Scanned)")
+			fmt.Printf("[DEEP SCAN] Finished for %s\n", t.URL)
+
+		}(target)
+	}
+	http.Redirect(w, r, "/targets", http.StatusSeeOther)
 }
