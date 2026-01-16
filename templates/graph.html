@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>DarkWatch - Network Graph</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&display=swap" rel="stylesheet">
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+
+    <style>
+        :root { --bg-dark: #12141c; --bg-panel: #1b1e2b; --text: #e0e6ed; --text-muted: #8c9cad; --accent-blue: #0f62fe; --high: #fa4d56; --med: #f1c21b; --low: #42be65; --border: #393939; }
+        
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: 'IBM Plex Mono', monospace; background: var(--bg-dark); color: var(--text); display: flex; height: 100vh; overflow: hidden; font-size: 13px; }
+
+        /* SIDEBAR CSS (Targets ile aynı standart) */
+        .sidebar { width: 240px; background: #0b0d12; border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px; flex-shrink: 0; }
+        .brand { font-size: 16px; font-weight: 600; margin-bottom: 40px; letter-spacing: 1px; } .brand span { color: var(--accent-blue); }
+        
+        .nav-group { display: flex; gap: 10px; flex-direction: column; width: 100%; }
+        .sidebar .nav-group .menu-item { border-left: 3px solid transparent; border-bottom: none; }
+        
+        .menu-item { padding: 12px 15px; margin-bottom: 5px; color: var(--text-muted); text-decoration: none; display: block; }
+        .menu-item:hover, .menu-item.active { background: rgba(255,255,255,0.05); color: #fff; border-left-color: var(--accent-blue); }
+        .logout { margin-top: auto; color: var(--high); }
+
+        /* MAIN CONTENT */
+        .main-content { flex: 1; position: relative; display: flex; flex-direction: column; }
+        
+        .header {
+            padding: 20px;
+            background: var(--bg-dark);
+            border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+            z-index: 1000; /* Butonların tıklanabilir olması için */
+            position: relative; 
+            flex-wrap: wrap; gap: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        /* GRAPH CONTAINER */
+        #network {
+            flex: 1;
+            background: #000;
+            width: 100%;
+            height: 100%;
+        }
+
+        #loading {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: var(--accent-blue); font-size: 20px; display: none;
+            z-index: 50; pointer-events: none;
+        }
+
+        #info-panel {
+            position: absolute; top: 80px; right: 20px;
+            width: 300px; background: rgba(27, 30, 43, 0.95);
+            border: 1px solid var(--border); padding: 15px;
+            display: none; box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+            z-index: 20;
+        }
+        .info-row { margin-bottom: 8px; font-size: 12px; }
+        .info-label { color: var(--text-muted); display: block; font-size: 10px; margin-bottom: 2px; }
+        .info-val { color: #fff; word-break: break-all; }
+
+        /* MOBİL CSS */
+        @media (max-width: 900px) {
+            body { flex-direction: column; height: auto; overflow: auto; }
+            .sidebar { width: 100%; height: auto; flex-direction: column; align-items: center; padding: 15px; }
+            .brand { margin-bottom: 15px; margin-right: 0; }
+            
+            .nav-group { flex-direction: row; flex-wrap: wrap; justify-content: center; width: 100%; gap: 5px; }
+            .sidebar .nav-group .menu-item { border-left: none; border-bottom: 2px solid transparent; padding: 8px 12px; font-size: 12px; }
+            .sidebar .nav-group .menu-item.active { border-bottom-color: var(--accent-blue); background: transparent; }
+            .logout { margin-top: 15px; }
+
+            #network { min-height: 500px; }
+            #info-panel { position: fixed; bottom: 20px; top: auto; right: 20px; left: 20px; width: auto; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="brand"><span>//</span> DARK_WATCH</div>
+        
+        <div class="nav-group">
+            <a href="/" class="menu-item">DASHBOARD</a>
+            <a href="/targets" class="menu-item">TARGETS</a>
+            <a href="/graph" class="menu-item active">LINK ANALYSIS</a>
+        </div>
+
+        <a href="/logout" class="menu-item logout">LOGOUT</a>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <div>
+                <div style="font-size: 11px; color: var(--text-muted);">INTELLIGENCE / VISUALIZATION</div>
+                <h2 style="margin:0; font-size: 20px;">RELATIONSHIP GRAPH</h2>
+            </div>
+            <button onclick="loadGraph()" style="background:var(--accent-blue); color:#fff; border:none; padding:8px 15px; cursor:pointer; font-family:inherit; font-weight:600;">REFRESH DATA</button>
+        </div>
+
+        <div id="loading">FETCHING NODE DATA...</div>
+        <div id="network"></div>
+
+        <div id="info-panel">
+            <h3 style="margin-top:0; color:var(--accent-blue); font-size:14px; border-bottom:1px solid var(--border); padding-bottom:5px;">NODE DETAILS</h3>
+            <div class="info-row">
+                <span class="info-label">TITLE</span>
+                <span class="info-val" id="n-title">-</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">URL</span>
+                <span class="info-val" id="n-url">-</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">RISK SCORE</span>
+                <span class="info-val" id="n-risk">-</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var network = null;
+
+        function loadGraph() {
+            var loadingEl = document.getElementById('loading');
+            loadingEl.style.display = 'block';
+            loadingEl.innerText = "FETCHING NODE DATA...";
+            
+            fetch('/api/graph')
+                .then(response => {
+                    if (!response.ok) { throw new Error("HTTP error " + response.status); }
+                    return response.json();
+                })
+                .then(data => {
+                    loadingEl.style.display = 'none';
+                    console.log("Graph Data Received:", data); // Debug için konsola yaz
+                    if (!data.nodes || data.nodes.length === 0) {
+                        alert("No graph data found. Please run a 'DEEP SCAN' on a target first.");
+                        return;
+                    }
+                    drawGraph(data.nodes, data.edges);
+                })
+                .catch(err => {
+                    console.error(err);
+                    loadingEl.style.display = 'block';
+                    loadingEl.innerText = "ERROR LOADING DATA: " + err.message;
+                });
+        }
+
+        function drawGraph(apiNodes, apiEdges) {
+            var container = document.getElementById('network');
+
+            // 1. Node'ları Oluştur
+            var nodes = new vis.DataSet(
+                apiNodes.map(n => {
+                    let color = '#42be65'; // Low (Green)
+                    if (n.value >= 8) color = '#fa4d56'; // High (Red)
+                    else if (n.value >= 5) color = '#f1c21b'; // Med (Yellow)
+
+                    return {
+                        id: n.id,
+                        label: (n.label && n.label.length > 15) ? n.label.substring(0, 15) + "..." : (n.label || "Unknown"),
+                        title: n.id, 
+                        value: n.value + 5, 
+                        color: { background: color, border: color, highlight: { background: '#fff', border: '#fff'} },
+                        font: { color: '#e0e6ed', face: 'monospace' },
+                        fullTitle: n.label,
+                        fullUrl: n.id,
+                        risk: n.value
+                    };
+                })
+            );
+
+            // 2. Edge'leri (Çizgileri) Oluştur
+            var edges = new vis.DataSet(
+                apiEdges.map(e => ({
+                    from: e.from,
+                    to: e.to,
+                    arrows: 'to',
+                    color: { color: '#393939', highlight: '#0f62fe' },
+                    width: 1
+                }))
+            );
+
+            var data = { nodes: nodes, edges: edges };
+            var options = {
+                nodes: { shape: 'dot', shadow: true },
+                physics: { 
+                    stabilization: true, 
+                    barnesHut: { gravitationalConstant: -3000, springLength: 150 } 
+                },
+                interaction: { hover: true, tooltipDelay: 200 }
+            };
+
+            // Varsa eskisini sil
+            if(network !== null) { network.destroy(); network = null; }
+
+            // Yeni haritayı çiz
+            network = new vis.Network(container, data, options);
+
+            // 3. Olay Dinleyicileri (DÖNGÜNÜN DIŞINA ALINDI - DOĞRU YER)
+            network.on("stabilizationIterationsDone", function () {
+                network.fit();
+            });
+
+            network.on("click", function (params) {
+                if (params.nodes.length > 0) {
+                    var nodeId = params.nodes[0];
+                    var nodeData = nodes.get(nodeId);
+                    
+                    document.getElementById('n-title').innerText = nodeData.fullTitle || "N/A";
+                    document.getElementById('n-url').innerText = nodeData.fullUrl;
+                    document.getElementById('n-risk').innerText = nodeData.risk + "/10";
+                    document.getElementById('info-panel').style.display = 'block';
+                } else {
+                    document.getElementById('info-panel').style.display = 'none';
+                }
+            });
+        }
+
+        // Sayfa açılınca otomatik yükle
+        loadGraph();
+    </script>
+</body>
+</html>

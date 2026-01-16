@@ -140,3 +140,84 @@ func GetAllTargets() ([]models.Target, error) {
 
 	return targets, nil
 }
+
+func SearchContent(queryText string) ([]models.DarkWebContent, error) {
+
+	querySQL := `
+    SELECT id, source_name, source_url, content, title, published_date, criticality_score, category, matches 
+    FROM dark_web_contents 
+    WHERE 
+        source_url ILIKE $1 OR 
+        title ILIKE $1 OR 
+        content ILIKE $1 OR 
+        matches ILIKE $1
+    ORDER BY published_date DESC`
+
+	searchTerm := "%" + queryText + "%"
+
+	rows, err := DB.Query(querySQL, searchTerm)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var contents []models.DarkWebContent
+	for rows.Next() {
+		var c models.DarkWebContent
+		if err := rows.Scan(&c.ID, &c.SourceName, &c.SourceURL, &c.Content, &c.Title,
+			&c.PublishedDate, &c.CriticalityScore, &c.Category, &c.Matches); err != nil {
+			return nil, err
+		}
+		contents = append(contents, c)
+	}
+	return contents, nil
+}
+
+func AddLinkRelationship(source string, target string) error {
+	if source == target {
+		return nil
+	}
+	query := `INSERT INTO link_relationships (source_url, target_url) VALUES ($1, $2) ON CONFLICT (source_url, target_url) DO NOTHING`
+	_, err := DB.Exec(query, source, target)
+	return err
+}
+
+func GetGraphData() ([]models.GraphNode, []models.GraphEdge, error) {
+	nodeQuery := `
+        SELECT DISTINCT ON (source_url) source_url, title, criticality_score, category 
+        FROM dark_web_contents 
+        ORDER BY source_url, published_date DESC`
+
+	rows, err := DB.Query(nodeQuery)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+
+	var nodes []models.GraphNode
+	for rows.Next() {
+		var n models.GraphNode
+		if err := rows.Scan(&n.ID, &n.Label, &n.Value, &n.Group); err != nil {
+			continue
+		}
+		nodes = append(nodes, n)
+	}
+
+	edgeQuery := `SELECT source_url, target_url FROM link_relationships`
+	edgeRows, err := DB.Query(edgeQuery)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer edgeRows.Close()
+
+	var edges []models.GraphEdge
+	for edgeRows.Next() {
+		var e models.GraphEdge
+		if err := edgeRows.Scan(&e.From, &e.To); err != nil {
+			continue
+		}
+		edges = append(edges, e)
+	}
+
+	return nodes, edges, nil
+}

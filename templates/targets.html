@@ -12,20 +12,28 @@
         
         .sidebar { width: 240px; background: #0b0d12; border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px; flex-shrink: 0; }
         .brand { font-size: 16px; font-weight: 600; margin-bottom: 40px; letter-spacing: 1px; } .brand span { color: var(--accent-blue); }
-        .menu-item { padding: 12px 15px; margin-bottom: 5px; color: var(--text-muted); text-decoration: none; border-left: 3px solid transparent; display: block; }
+        
+        /* Menü Grubu için yeni sınıf */
+        .nav-group { display: flex; gap: 10px; flex-direction: column; width: 100%; }
+        /* Sidebar dikeyken menü linkleri */
+        .sidebar .nav-group .menu-item { border-left: 3px solid transparent; border-bottom: none; }
+        
+        .menu-item { padding: 12px 15px; margin-bottom: 5px; color: var(--text-muted); text-decoration: none; display: block; }
         .menu-item:hover, .menu-item.active { background: rgba(255,255,255,0.05); color: #fff; border-left-color: var(--accent-blue); }
         .logout { margin-top: auto; color: var(--high); }
 
         .main-content { flex: 1; padding: 30px; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; }
-        .header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 1px solid var(--border); padding-bottom: 15px; margin-bottom: 10px; }
+        
+        /* Header Responsive */
+        .header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 1px solid var(--border); padding-bottom: 15px; margin-bottom: 10px; flex-wrap: wrap; gap: 10px; }
         h2 { margin: 0; font-weight: 500; font-size: 22px; }
 
         .panel { background: var(--bg-panel); border: 1px solid var(--border); padding: 20px; }
         
-        .add-form { display: flex; gap: 10px; margin-bottom: 20px; }
-        input[type="text"] { flex: 1; background: #000; border: 1px solid var(--border); color: #fff; padding: 10px; font-family: inherit; }
+        .add-form { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        input[type="text"] { flex: 1; background: #000; border: 1px solid var(--border); color: #fff; padding: 10px; font-family: inherit; min-width: 200px; }
         input:focus { outline: 1px solid var(--accent-blue); }
-        .btn { background: var(--accent-blue); color: #fff; border: none; padding: 0 20px; cursor: pointer; font-weight: 600; transition: 0.2s; }
+        .btn { background: var(--accent-blue); color: #fff; border: none; padding: 0 20px; cursor: pointer; font-weight: 600; transition: 0.2s; height: 38px; }
         .btn:hover { opacity: 0.9; }
 
         .table-responsive { overflow-x: auto; border: 1px solid var(--border); }
@@ -40,15 +48,48 @@
 
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
-        .btn-sm { background: transparent; border: 1px solid var(--accent-blue); color: var(--accent-blue); padding: 5px 10px; cursor: pointer; font-size: 11px; margin-left: 5px; }
+        .btn-sm { background: transparent; border: 1px solid var(--accent-blue); color: var(--accent-blue); padding: 5px 10px; cursor: pointer; font-size: 11px; margin-left: 5px; white-space: nowrap; }
         .btn-sm:hover { background: var(--accent-blue); color: white; }
         .btn-del { border-color: var(--high); color: var(--high); }
         .btn-del:hover { background: var(--high); }
 
+        /* --- MOBİL DÜZENLEMELERİ --- */
         @media (max-width: 900px) {
             body { flex-direction: column; height: auto; overflow: auto; }
-            .sidebar { width: 100%; height: auto; flex-direction: row; align-items: center; justify-content: space-between; padding: 10px 20px; }
-            .brand { margin: 0; }
+            
+            /* Sidebar'ı dikey yığın (column) yapıp ortalıyoruz */
+            .sidebar { 
+                width: 100%; 
+                height: auto; 
+                flex-direction: column; 
+                align-items: center; 
+                padding: 15px; 
+            }
+            
+            .brand { margin-bottom: 15px; margin-right: 0; }
+            
+            /* Menü linklerini yan yana diz ama sığmazsa aşağı at (wrap) */
+            .nav-group { 
+                flex-direction: row; 
+                flex-wrap: wrap; 
+                justify-content: center; 
+                width: 100%; 
+                gap: 5px;
+            }
+            
+            /* Mobilde menü linkleri alt çizgiyle aktif olsun */
+            .sidebar .nav-group .menu-item { 
+                border-left: none; 
+                border-bottom: 2px solid transparent; 
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+            .sidebar .nav-group .menu-item.active { 
+                border-bottom-color: var(--accent-blue); 
+                background: transparent; 
+            }
+            
+            .logout { margin-top: 15px; }
         }
     </style>
 </head>
@@ -56,10 +97,13 @@
 
     <div class="sidebar">
         <div class="brand"><span>//</span> DARK_WATCH</div>
-        <div style="display:flex; gap:10px;">
+        
+        <div class="nav-group">
             <a href="/" class="menu-item">DASHBOARD</a>
             <a href="/targets" class="menu-item active">TARGETS</a>
+            <a href="/graph" class="menu-item">LINK ANALYSIS</a>
         </div>
+
         <a href="/logout" class="menu-item logout">LOGOUT</a>
     </div>
 
@@ -109,7 +153,7 @@
                             <td><span style="background: rgba(255,255,255,0.1); padding: 2px 6px; font-size: 10px;">{{ .Source }}</span></td>
                             <td>{{ .LastScannedAt.Format "01-02 15:04" }}</td>
                             <td style="text-align: right;">
-                                <div style="display: flex; justify-content: flex-end;">
+                                <div style="display: flex; justify-content: flex-end; gap: 2px;">
                                     <form action="/scan-now" method="POST" style="margin:0;">
                                         <input type="hidden" name="id" value="{{ .ID }}">
                                         <button type="submit" class="btn-sm">SCAN</button>
@@ -121,6 +165,9 @@
                                     </form>
 
                                     <form action="/delete-target" method="POST" style="margin:0;">
+                                        <input type="hidden" name="id" value="{{ .ID }}">
+                                        <button type="submit" class="btn-sm btn-del">DEL</button>
+                                    </form>
                                 </div>
                             </td>
                         </tr>

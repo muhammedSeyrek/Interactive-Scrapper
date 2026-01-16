@@ -21,8 +21,20 @@ type DarkWebContent struct {
 type Target struct {
 	ID            int       `json:"id"`
 	URL           string    `json:"url"`
-	Source        string    `json:"source"` // yaml, database, etc.
+	Source        string    `json:"source"`
 	CreatedAt     time.Time `json:"created_at"`
-	LastStatus    string    `json:"last_status"`     // Ex: "Scanning", "Online", "Failed"
-	LastScannedAt time.Time `json:"last_scanned_at"` // Ex: 2026-01-10...
+	LastStatus    string    `json:"last_status"`
+	LastScannedAt time.Time `json:"last_scanned_at"`
+}
+
+type GraphNode struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
+	Value int    `json:"value"`
+	Group string `json:"group"`
+}
+
+type GraphEdge struct {
+	From string `json:"from"`
+	To   string `json:"to"`
 }

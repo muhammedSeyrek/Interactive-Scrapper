@@ -1,10 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"interactive-scraper/database"
 	"interactive-scraper/models"
+	"interactive-scraper/reports"
 	"interactive-scraper/scraper"
 	"io/ioutil"
 	"log"
@@ -26,9 +28,10 @@ type LoginData struct {
 
 // DashboardStats holds statistics for the dashboard
 type PageData struct {
-	Contents []models.DarkWebContent
-	Targets  []models.Target
-	Stats    DashboardStats
+	Contents    []models.DarkWebContent
+	Targets     []models.Target
+	Stats       DashboardStats
+	SearchQuery string
 }
 
 type DashboardStats struct {
@@ -72,8 +75,13 @@ func main() {
 	http.HandleFunc("/delete-target", authMiddleware(deleteTargetHandler))
 	http.HandleFunc("/targets", authMiddleware(targetsHandler))
 	http.HandleFunc("/scan-now", authMiddleware(scanNowHandler))
-	http.HandleFunc("/", authMiddleware(dashboardHandler))
 	http.HandleFunc("/deep-scan", authMiddleware(deepScanHandler))
+	http.HandleFunc("/export/json", authMiddleware(exportJSONHandler))
+	http.HandleFunc("/export/pdf", authMiddleware(exportPDFHandler))
+	http.HandleFunc("/graph", authMiddleware(graphPageHandler))
+	http.HandleFunc("/api/graph", authMiddleware(graphDataHandler))
+
+	http.HandleFunc("/", authMiddleware(dashboardHandler))
 
 	port := ":8080"
 	fmt.Printf("Starting server on port: http://localhost%s\n", port)
@@ -131,11 +139,16 @@ func scanNowHandler(w http.ResponseWriter, r *http.Request) {
 			data, err := scraper.ScrapeURL(t.URL)
 			if err != nil {
 				database.UpdateTargetStatus(t.ID, "Failed")
-				fmt.Println("[%s] scan its failed.\n", t.URL)
+				fmt.Printf("[%s] scan failed: %v\n", t.URL, err)
 			} else {
-				database.SaveDarkWebContent(data)
-				database.UpdateTargetStatus(t.ID, "Online")
-				fmt.Println("[%s] scan its done: %v\n", t.URL, err)
+				saveErr := database.SaveDarkWebContent(data)
+				if saveErr != nil {
+					fmt.Printf("!!! DB SAVE ERROR for %s: %v\n", t.URL, saveErr)
+					database.UpdateTargetStatus(t.ID, "DB Error")
+				} else {
+					database.UpdateTargetStatus(t.ID, "Online")
+					fmt.Printf("[%s] scan success and saved.\n", t.URL)
+				}
 			}
 		}(target)
 
@@ -319,8 +332,16 @@ func dashboardHandler(w http.ResponseWriter, r *http.Request) {
 
 	targets, _ := database.GetAllTargets()
 
-	// Fetch all content from the database
-	contents, err := database.GetAllContent()
+	query := r.URL.Query().Get("q")
+
+	var contents []models.DarkWebContent
+	var err error
+
+	if query != "" {
+		contents, err = database.SearchContent(query)
+	} else {
+		contents, err = database.GetAllContent()
+	}
 
 	if err != nil {
 		log.Printf("Error getting content: %v", err)
@@ -333,9 +354,9 @@ func dashboardHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, c := range contents {
-		if c.CriticalityScore >= 7 {
+		if c.CriticalityScore >= 8 {
 			stats.HighRisk++
-		} else if c.CriticalityScore >= 4 {
+		} else if c.CriticalityScore >= 5 {
 			stats.MediumRisk++
 		} else {
 			stats.LowRisk++
@@ -343,13 +364,13 @@ func dashboardHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := PageData{
-		Contents: contents,
-		Targets:  targets,
-		Stats:    stats,
+		Contents:    contents,
+		Targets:     targets,
+		Stats:       stats,
+		SearchQuery: query,
 	}
 
 	tmpl, err := template.ParseFiles("templates/index.html")
-
 	if err != nil {
 		http.Error(w, "Failed to parse template: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -397,6 +418,7 @@ func deepScanHandler(w http.ResponseWriter, r *http.Request) {
 		database.UpdateTargetStatus(target.ID, "Deep Scanning...")
 
 		go func(t models.Target) {
+
 			mainResult, err := scraper.ScrapeURL(t.URL)
 			if err != nil {
 				database.UpdateTargetStatus(t.ID, "Failed")
@@ -405,6 +427,13 @@ func deepScanHandler(w http.ResponseWriter, r *http.Request) {
 			database.SaveDarkWebContent(mainResult)
 
 			links := scraper.ExtractOnionLinks(mainResult.Content, t.URL)
+
+			for _, foundLink := range links {
+				dbErr := database.AddLinkRelationship(t.URL, foundLink)
+				if dbErr != nil {
+					fmt.Printf("Relationship save error: %v\n", dbErr)
+				}
+			}
 
 			maxLinks := 5
 			if len(links) < maxLinks {
@@ -415,13 +444,13 @@ func deepScanHandler(w http.ResponseWriter, r *http.Request) {
 			fmt.Printf("[DEEP SCAN] Found %d links. Scanning top %d...\n", len(links), len(subLinks))
 
 			for _, link := range subLinks {
-
 				fmt.Printf("   -> Spawning worker for: %s\n", link)
 
 				subResult, subErr := scraper.ScrapeURL(link)
 				if subErr == nil {
 					subResult.Title = "[SUB] " + subResult.Title
 					subResult.Category = subResult.Category + " (DeepScan)"
+
 					database.SaveDarkWebContent(subResult)
 				}
 			}
@@ -432,4 +461,84 @@ func deepScanHandler(w http.ResponseWriter, r *http.Request) {
 		}(target)
 	}
 	http.Redirect(w, r, "/targets", http.StatusSeeOther)
+}
+
+func exportJSONHandler(w http.ResponseWriter, r *http.Request) {
+	idStr := r.URL.Query().Get("id")
+	id, _ := strconv.Atoi(idStr)
+
+	content, err := database.GetContentByID(id)
+	if err != nil {
+		http.Error(w, "Content not found", http.StatusNotFound)
+		return
+	}
+
+	jsonData, err := reports.GenerateJSON(content)
+	if err != nil {
+		http.Error(w, "JSON generation failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=report_%d.json", id))
+	w.Write(jsonData)
+}
+
+func exportPDFHandler(w http.ResponseWriter, r *http.Request) {
+	idStr := r.URL.Query().Get("id")
+	id, _ := strconv.Atoi(idStr)
+
+	content, err := database.GetContentByID(id)
+	if err != nil {
+		http.Error(w, "Content not found", http.StatusNotFound)
+		return
+	}
+
+	pdfBuf, err := reports.GeneratePDF(content)
+	if err != nil {
+		log.Printf("PDF Error: %v", err)
+		http.Error(w, "PDF generation failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=threat_report_%d.pdf", id))
+	w.Write(pdfBuf.Bytes())
+}
+
+func graphDataHandler(w http.ResponseWriter, r *http.Request) {
+	nodes, edges, err := database.GetGraphData()
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"error": "` + err.Error() + `"}`))
+		return
+	}
+
+	if nodes == nil {
+		nodes = []models.GraphNode{}
+	}
+	if edges == nil {
+		edges = []models.GraphEdge{}
+	}
+
+	response := struct {
+		Nodes []models.GraphNode `json:"nodes"`
+		Edges []models.GraphEdge `json:"edges"`
+	}{
+		Nodes: nodes,
+		Edges: edges,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+func graphPageHandler(w http.ResponseWriter, r *http.Request) {
+	tmpl, err := template.ParseFiles("templates/graph.html")
+	if err != nil {
+		http.Error(w, "Template error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	tmpl.Execute(w, nil)
 }

@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <title>Analysis Report #{{ .ID }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
-        :root { --bg-dark: #12141c; --bg-panel: #1b1e2b; --text: #e0e6ed; --border: #393939; --accent: #0f62fe; --high: #fa4d56; }
+        :root { --bg-dark: #12141c; --bg-panel: #1b1e2b; --text: #e0e6ed; --border: #393939; --accent: #0f62fe; --high: #fa4d56; --warn: #f1c21b; --low: #42be65; }
         
-        * { box-sizing: border-box; } /* Taşmaları önlemek için kritik */
+        * { box-sizing: border-box; }
         
         body { 
             background: var(--bg-dark); 
@@ -16,7 +16,7 @@
             font-family: 'IBM Plex Mono', monospace; 
             margin: 0; 
             padding: 20px; 
-            overflow-x: hidden; /* Yatay scrollu engelle */
+            overflow-x: hidden;
         }
 
         .container { 
@@ -25,78 +25,109 @@
             margin: 0 auto; 
         }
         
-        /* BACK BUTTON - EN ÜSTTE */
+        /* NAV BAR */
         .nav-bar { margin-bottom: 20px; }
-        .btn-back { 
-            color: var(--text); 
-            text-decoration: none; 
-            font-size: 13px; 
-            display: inline-flex; 
-            align-items: center; 
-            border: 1px solid var(--border); 
-            padding: 8px 15px;
-            background: var(--bg-panel);
-            transition: 0.2s;
-        }
-        .btn-back:hover { border-color: var(--accent); color: var(--accent); }
-
+        
+        /* HEADER YAPISI - FLEXBOX İLE HİZALAMA */
         .header { 
             border-bottom: 1px solid var(--border); 
             padding-bottom: 20px; 
             margin-bottom: 30px; 
             display: flex; 
-            flex-wrap: wrap; 
-            justify-content: space-between; 
-            align-items: center; 
-            gap: 15px; 
+            justify-content: space-between; /* Sağı ve solu ayır */
+            align-items: flex-end; /* Alt çizgiye hizala */
+            flex-wrap: wrap;
+            gap: 20px;
         }
+
+        .header-left { flex: 1; min-width: 300px; }
+        .header-right { display: flex; align-items: center; gap: 10px; }
         
-        h1 { margin: 0; font-size: 20px; word-break: break-word; line-height: 1.4; }
+        h1 { margin: 0; font-size: 24px; font-weight: 400; line-height: 1.2; color: #fff; }
+        .report-id { font-size: 11px; color: #8c9cad; margin-bottom: 5px; letter-spacing: 0.5px; }
         
-        .badge { padding: 6px 12px; background: var(--border); font-size: 12px; white-space: nowrap; }
-        .high { background: rgba(250, 77, 86, 0.2); color: var(--high); border: 1px solid var(--high); }
-        
+        /* BUTTON STYLES - TEK TİP */
+        .btn { 
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 32px; /* Hepsi eşit yükseklikte */
+            padding: 0 15px;
+            font-size: 12px;
+            font-family: 'IBM Plex Mono', monospace;
+            text-decoration: none;
+            color: var(--text);
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        /* Standart Buton (Back & JSON) Hover */
+        .btn:hover { border-color: var(--accent); color: var(--accent); }
+
+        /* Primary Button (PDF) */
+        .btn-primary { 
+            background: var(--accent); 
+            color: white; 
+            border-color: var(--accent); 
+            font-weight: 600; 
+        }
+        .btn-primary:hover { 
+            background: #0353e9; 
+            color: white; 
+            box-shadow: 0 2px 8px rgba(15, 98, 254, 0.4); 
+        }
+
+        /* RISK SCORE BADGE */
+        .risk-badge {
+            display: inline-flex;
+            align-items: center;
+            height: 32px;
+            padding: 0 12px;
+            font-size: 12px;
+            font-weight: 600;
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.05);
+            margin-right: 10px; /* Butonlardan biraz ayır */
+            color: var(--text);
+        }
+        .risk-badge.high { border-color: var(--high); color: var(--high); background: rgba(250, 77, 86, 0.1); }
+        .risk-badge.med  { border-color: var(--warn); color: var(--warn); background: rgba(241, 194, 27, 0.1); }
+        .risk-badge.low  { border-color: var(--low);  color: var(--low);  background: rgba(66, 190, 101, 0.1); }
+
+        /* CONTENT GRID */
         .grid { 
             display: grid; 
-            grid-template-columns: 1fr 1.5fr; /* Sağ taraf biraz daha geniş */
+            grid-template-columns: 1fr 1.5fr; 
             gap: 30px; 
         }
         
-        .panel { background: var(--bg-panel); border: 1px solid var(--border); padding: 20px; margin-bottom: 20px; overflow: hidden; }
-        .panel h3 { margin-top: 0; color: var(--accent); font-size: 13px; text-transform: uppercase; border-bottom: 1px solid var(--border); padding-bottom: 10px; letter-spacing: 1px; }
+        .panel { background: var(--bg-panel); border: 1px solid var(--border); padding: 20px; margin-bottom: 20px; }
+        .panel h3 { margin-top: 0; color: var(--accent); font-size: 12px; font-weight: 600; text-transform: uppercase; border-bottom: 1px solid var(--border); padding-bottom: 10px; letter-spacing: 1px; }
         
         .screenshot-container { 
-            width: 100%; 
-            min-height: 200px; 
-            background: #000; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
+            width: 100%; min-height: 200px; background: #000; 
+            display: flex; align-items: center; justify-content: center; 
             border: 1px solid var(--border); 
         }
         img { max-width: 100%; height: auto; display: block; }
         
-        /* RAW CONTENT - Scroll sorununu çözen ayarlar */
         pre { 
-            white-space: pre-wrap;       /* Satırları kır */
-            word-break: break-all;       /* Uzun kelimeleri zorla kır */
-            font-size: 11px; 
-            color: #8c9cad; 
-            max-height: 500px; 
-            overflow-y: auto; 
-            background: rgba(0,0,0,0.3); 
-            padding: 15px; 
-            border: 1px solid var(--border);
+            white-space: pre-wrap; word-break: break-all; font-size: 11px; 
+            color: #8c9cad; max-height: 500px; overflow-y: auto; 
+            background: rgba(0,0,0,0.3); padding: 15px; border: 1px solid var(--border);
         }
 
-        .meta-row { margin-bottom: 10px; font-size: 13px; }
-        .meta-label { color: #8c9cad; display: inline-block; width: 80px; }
+        .meta-row { margin-bottom: 10px; font-size: 13px; display: flex; }
+        .meta-label { color: #8c9cad; width: 80px; flex-shrink: 0; }
         .meta-val { color: var(--text); word-break: break-all; }
 
         @media (max-width: 900px) {
-            .grid { grid-template-columns: 1fr; } /* Mobilde tek kolon */
-            body { padding: 15px; }
-            h1 { font-size: 18px; }
+            .grid { grid-template-columns: 1fr; }
+            .header { flex-direction: column; align-items: flex-start; }
+            .header-right { width: 100%; justify-content: space-between; }
         }
     </style>
 </head>
@@ -104,16 +135,27 @@
     <div class="container">
         
         <div class="nav-bar">
-            <a href="/" class="btn-back">&larr; BACK TO DASHBOARD</a>
+            <a href="/" class="btn">&larr; DASHBOARD</a>
         </div>
 
         <div class="header">
-            <div style="flex: 1;">
-                <div style="font-size: 11px; color: #8c9cad; margin-bottom: 5px;">REPORT ID: #{{ .ID }}</div>
+            <div class="header-left">
+                <div class="report-id">REPORT ID: #{{ .ID }}</div>
                 <h1>{{ .Title }}</h1>
             </div>
-            <div>
-                <span class="badge {{ if ge .CriticalityScore 7 }}high{{ end }}">RISK SCORE: {{ .CriticalityScore }}/10</span>
+
+            <div class="header-right">
+                <div class="risk-badge {{ if ge .CriticalityScore 8 }}high{{ else if ge .CriticalityScore 5 }}med{{ else }}low{{ end }}">
+                    RISK: {{ .CriticalityScore }}/10
+                </div>
+
+                <a href="/export/json?id={{ .ID }}" target="_blank" class="btn">
+                    JSON
+                </a>
+
+                <a href="/export/pdf?id={{ .ID }}" target="_blank" class="btn btn-primary">
+                    EXPORT PDF
+                </a>
             </div>
         </div>
 
@@ -121,18 +163,9 @@
             <div class="left-col">
                 <div class="panel">
                     <h3>Metadata</h3>
-                    <div class="meta-row">
-                        <span class="meta-label">URL:</span>
-                        <span class="meta-val"><a href="{{ .SourceURL }}" style="color:var(--accent); text-decoration:none;" target="_blank">{{ .SourceURL }}</a></span>
-                    </div>
-                    <div class="meta-row">
-                        <span class="meta-label">DATE:</span>
-                        <span class="meta-val">{{ .PublishedDate.Format "2006-01-02 15:04" }}</span>
-                    </div>
-                    <div class="meta-row">
-                        <span class="meta-label">CAT:</span>
-                        <span class="meta-val">{{ .Category }}</span>
-                    </div>
+                    <div class="meta-row"><span class="meta-label">URL:</span> <span class="meta-val"><a href="{{ .SourceURL }}" style="color:var(--accent); text-decoration:none;" target="_blank">{{ .SourceURL }}</a></span></div>
+                    <div class="meta-row"><span class="meta-label">DATE:</span> <span class="meta-val">{{ .PublishedDate.Format "2006-01-02 15:04" }}</span></div>
+                    <div class="meta-row"><span class="meta-label">CAT:</span> <span class="meta-val">{{ .Category }}</span></div>
                 </div>
 
                 <div class="panel">

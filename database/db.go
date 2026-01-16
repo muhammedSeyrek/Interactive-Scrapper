@@ -43,17 +43,19 @@ func InitDB() {
 
 func createTables() {
 	query := `
-		CREATE TABLE IF NOT EXISTS dark_web_contents (
-			id SERIAL PRIMARY KEY,
-			source_name VARCHAR(255) NOT NULL,
-			source_url TEXT NOT NULL,
-			content TEXT NOT NULL,
-			title VARCHAR(255),
-			published_date TIMESTAMP,
-			criticality_score INT DEFAULT 0,
-			category VARCHAR(100),
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-		);`
+        CREATE TABLE IF NOT EXISTS dark_web_contents (
+            id SERIAL PRIMARY KEY,
+            source_name VARCHAR(255) NOT NULL,
+            source_url TEXT NOT NULL,
+            content TEXT NOT NULL,
+            title VARCHAR(255),
+            published_date TIMESTAMP,
+            criticality_score INT DEFAULT 0,
+            category VARCHAR(100),
+            matches TEXT,      -- YENİ EKLENDİ
+            screenshot TEXT,   -- YENİ EKLENDİ
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );`
 
 	_, err := DB.Exec(query)
 	if err != nil {
@@ -76,4 +78,18 @@ func createTables() {
 	}
 
 	fmt.Println("Tables created or already exist.")
+
+	queryRelations := `
+        CREATE TABLE IF NOT EXISTS link_relationships (
+            id SERIAL PRIMARY KEY,
+            source_url TEXT NOT NULL, 
+            target_url TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(source_url, target_url)
+        );`
+
+	_, err = DB.Exec(queryRelations)
+	if err != nil {
+		log.Fatal("Error creating link_relationships table: ", err)
+	}
 }

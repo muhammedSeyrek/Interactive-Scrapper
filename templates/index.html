@@ -12,10 +12,14 @@
         * { box-sizing: border-box; }
         body { margin: 0; font-family: 'IBM Plex Mono', monospace; background: var(--bg-dark); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; font-size: 13px; }
         
-        /* SIDEBAR */
-        .sidebar { width: 240px; background: #0b0d12; border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px; flex-shrink: 0; transition: all 0.3s; }
+        /* --- GÜNCELLENEN SIDEBAR CSS --- */
+        .sidebar { width: 240px; background: #0b0d12; border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px; flex-shrink: 0; }
         .brand { font-size: 16px; font-weight: 600; margin-bottom: 40px; letter-spacing: 1px; } .brand span { color: var(--accent-blue); }
-        .menu-item { padding: 12px 15px; margin-bottom: 5px; color: var(--text-muted); text-decoration: none; border-left: 3px solid transparent; display: block; }
+        
+        .nav-group { display: flex; gap: 10px; flex-direction: column; width: 100%; }
+        .sidebar .nav-group .menu-item { border-left: 3px solid transparent; border-bottom: none; }
+        
+        .menu-item { padding: 12px 15px; margin-bottom: 5px; color: var(--text-muted); text-decoration: none; display: block; }
         .menu-item:hover, .menu-item.active { background: rgba(255,255,255,0.05); color: #fff; border-left-color: var(--accent-blue); }
         .logout { margin-top: auto; color: var(--high); }
 
@@ -36,44 +40,44 @@
         .stat-title { color: var(--text-muted); font-size: 11px; margin-bottom: 5px; text-transform: uppercase; }
         .stat-value { font-size: 28px; font-weight: 300; }
 
-        /* TARGETS PANEL */
-        .add-target-form { display: flex; gap: 10px; margin-bottom: 15px; }
-        input[type="text"] { flex: 1; background: #000; border: 1px solid var(--border); color: #fff; padding: 10px; font-family: inherit; }
-        input:focus { outline: 1px solid var(--accent-blue); }
-        .btn { background: var(--accent-blue); color: #fff; border: none; padding: 0 20px; cursor: pointer; font-weight: 600; font-family: inherit; transition: 0.2s; }
-        .btn:hover { opacity: 0.9; }
-        
-        .target-list { max-height: 200px; overflow-y: auto; border: 1px solid var(--border); }
-        .target-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid var(--border); background: rgba(255,255,255,0.02); }
-        .target-item:last-child { border-bottom: none; }
-        .btn-del { background: transparent; color: var(--high); border: 1px solid var(--high); padding: 4px 8px; font-size: 10px; cursor: pointer; }
-        .btn-del:hover { background: var(--high); color: #fff; }
+        /* SEARCH BAR */
+        .search-wrapper { display: flex; justify-content: flex-end; margin-bottom: 20px; width: 100%; }
+        .search-container { display: flex; width: 100%; max-width: 500px; position: relative; background: #000; }
+        .search-input { width: 100%; padding: 12px 15px 12px 40px; background: #000; border: 1px solid var(--border); color: #fff; font-family: 'IBM Plex Mono', monospace; font-size: 13px; transition: all 0.2s; padding-right: 120px; }
+        .search-input:focus { outline: none; border-color: var(--accent-blue); box-shadow: 0 0 0 2px rgba(15, 98, 254, 0.2); }
+        .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 14px; pointer-events: none; }
+        .search-clear { position: absolute; right: 100px; top: 50%; transform: translateY(-50%); color: var(--high); text-decoration: none; font-size: 14px; font-weight: bold; cursor: pointer; z-index: 2; }
+        .search-btn { position: absolute; right: 0; top: 0; height: 100%; background: var(--accent-blue); color: white; border: none; padding: 0 20px; font-family: inherit; font-weight: 600; cursor: pointer; text-transform: uppercase; transition: 0.2s; }
+        .search-btn:hover { background: #0353e9; }
 
-        /* TABLES */
+        /* TABLE */
         .table-responsive { overflow-x: auto; border: 1px solid var(--border); }
-        table { width: 100%; border-collapse: collapse; min-width: 800px; } /* Min-width ensures scrolling on mobile */
+        table { width: 100%; border-collapse: collapse; min-width: 800px; }
         th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid var(--border); }
         th { background: rgba(255,255,255,0.03); color: var(--text-muted); font-size: 11px; font-weight: 500; }
-        
         .badge { padding: 3px 8px; font-size: 10px; border: 1px solid transparent; }
         .badge.high { color: var(--high); background: rgba(250, 77, 86, 0.1); border-color: var(--high); }
         .badge.med { color: var(--med); background: rgba(241, 194, 27, 0.1); border-color: var(--med); }
         .badge.low { color: var(--low); background: rgba(66, 190, 101, 0.1); border-color: var(--low); }
-        
         .btn-analyze { color: var(--accent-blue); border: 1px solid var(--accent-blue); text-decoration: none; padding: 4px 10px; font-size: 10px; display: inline-block; transition: 0.2s; }
         .btn-analyze:hover { background: var(--accent-blue); color: #fff; }
 
-        /* RESPONSIVE MEDIA QUERIES */
+        /* --- GÜNCELLENEN MOBİL CSS --- */
         @media (max-width: 900px) {
             body { flex-direction: column; height: auto; overflow: auto; }
-            .sidebar { width: 100%; height: auto; flex-direction: row; overflow-x: auto; align-items: center; justify-content: space-between; padding: 10px 20px; }
-            .sidebar .menu-item { border-left: none; border-bottom: 2px solid transparent; padding: 10px; }
-            .sidebar .menu-item.active { border-bottom-color: var(--accent-blue); background: transparent; }
-            .brand { margin-bottom: 0; margin-right: 20px; }
+            .sidebar { width: 100%; height: auto; flex-direction: column; align-items: center; padding: 15px; }
+            .brand { margin-bottom: 15px; margin-right: 0; }
             
+            /* Nav Group Responsive */
+            .nav-group { flex-direction: row; flex-wrap: wrap; justify-content: center; width: 100%; gap: 5px; }
+            .sidebar .nav-group .menu-item { border-left: none; border-bottom: 2px solid transparent; padding: 8px 12px; font-size: 12px; }
+            .sidebar .nav-group .menu-item.active { border-bottom-color: var(--accent-blue); background: transparent; }
+            .logout { margin-top: 15px; }
+
             .top-row { grid-template-columns: 1fr; }
             .stats-grid { grid-template-columns: 1fr; }
-            .chart-card { height: 200px; }
+            .search-wrapper { justify-content: stretch; }
+            .search-container { max-width: 100%; }
         }
     </style>
 </head>
@@ -81,9 +85,13 @@
 
     <div class="sidebar">
         <div class="brand"><span>//</span> DARK_WATCH</div>
-        <div style="display:flex; gap:10px;"> <a href="/" class="menu-item active">DASHBOARD</a>
+        
+        <div class="nav-group">
+            <a href="/" class="menu-item active">DASHBOARD</a>
             <a href="/targets" class="menu-item">TARGETS</a>
+            <a href="/graph" class="menu-item">LINK ANALYSIS</a>
         </div>
+
         <a href="/logout" class="menu-item logout">LOGOUT</a>
     </div>
 
@@ -94,6 +102,17 @@
                 <h2>THREAT INTELLIGENCE</h2>
             </div>
             <div class="status">● OPERATIONAL</div>
+        </div>
+
+        <div class="search-wrapper">
+            <form action="/" method="GET" class="search-container">
+                <span class="search-icon">🔍</span>
+                <input type="text" name="q" class="search-input" placeholder="Search IP, Email, Wallet..." value="{{ .SearchQuery }}">
+                {{ if .SearchQuery }}
+                    <a href="/" class="search-clear">✖</a>
+                {{ end }}
+                <button type="submit" class="search-btn">SEARCH</button>
+            </form>
         </div>
 
         <div class="top-row">
