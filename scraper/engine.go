@@ -16,12 +16,17 @@ import (
 
 // Regex definition for previous compiled to performance
 var (
-	emailRegex  = regexp.MustCompile(`[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`)
-	cryptoRegex = regexp.MustCompile(`(bc1|[13])[a-km-zA-HJ-NP-Z1-9]{25,34}`) // Basic BTC regex
-	btcRegex    = regexp.MustCompile(`(bc1|[13])[a-km-zA-HJ-NP-Z1-9]{25,34}`) // Bitcoin
-	ethRegex    = regexp.MustCompile(`0x[a-fA-F0-9]{40}`)                     // Ethereum
-	xmrRegex    = regexp.MustCompile(`4[0-9AB][1-9A-HJ-NP-Za-km-z]{93}`)      // Monero (Dark web's king)
-	onionRegex  = regexp.MustCompile(`[a-z2-7]{16,56}\.onion`)
+	emailRegex = regexp.MustCompile(`[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`)
+	// Bitcoin: Both old one (1...), and Segwit (3...), and Bech32 (bc1...) formats
+	btcRegex = regexp.MustCompile(`\b(bc1|[13])[a-km-zA-HJ-NP-Z1-9]{25,34}\b`)
+	// Monero: King of dark web (It's start with 4... or 8... and both of them too long.)
+	xmrRegex = regexp.MustCompile(`\b(4|8)[0-9AB][1-9A-HJ-NP-Za-km-z]{93}\b`)
+	// Ethereum: It's starts with 0x
+	ethRegex = regexp.MustCompile(`\b0x[a-fA-F0-9]{40}\b`)
+	// Google Analytics/Tag Manager: critics for Deanonymization!
+	gaRegex = regexp.MustCompile(`\b(UA-\d+-\d+|G-[A-Z0-9]+|GTM-[A-Z0-9]+)\b`)
+	// PGP Key Block
+	pgpRegex = regexp.MustCompile(`-----BEGIN PGP PUBLIC KEY BLOCK-----`)
 )
 
 func ScrapeURL(targetURL string) (*models.DarkWebContent, error) {
@@ -37,14 +42,32 @@ func ScrapeURL(targetURL string) (*models.DarkWebContent, error) {
 		chromedp.Flag("no-sandbox", true),
 		chromedp.Flag("ignore-certificate-errors", true),
 		chromedp.ProxyServer(proxyAdd),
+		chromedp.UserAgent(`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36`),
 	)
+
+	if strings.Contains(targetURL, ".onion") {
+		proxyAdd := os.Getenv("TOR_PROXY")
+		if proxyAdd == "" {
+			proxyAdd = "socks5://127.0.0.1:9050"
+		}
+		opts = append(opts, chromedp.ProxyServer(proxyAdd))
+		fmt.Printf("[NETWORK] Tor mode is active: %s\n", targetURL)
+	} else {
+		fmt.Printf("[NETWORK] Clean Surface Web Mod (fast than tor): %s\n", targetURL)
+	}
+
 	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
 	defer cancel()
 
 	ctx, cancel := chromedp.NewContext(allocCtx)
 	defer cancel()
 
-	ctx, cancel = context.WithTimeout(ctx, 90*time.Second)
+	timeout := 30 * time.Second
+	if strings.Contains(targetURL, ".onion") {
+		timeout = 90 * time.Second
+	}
+
+	ctx, cancel = context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	var title, content string
@@ -63,7 +86,7 @@ func ScrapeURL(targetURL string) (*models.DarkWebContent, error) {
 		return nil, fmt.Errorf("timeout/context error: %w", err)
 	}
 
-	score, category, findings := AnalyzeContent(content, title)
+	score, category, findings, entities := AnalyzeContent(content, title)
 
 	if title == "" {
 		title = fmt.Sprintf("Tor Onion site: %s", targetURL)
@@ -93,6 +116,7 @@ func ScrapeURL(targetURL string) (*models.DarkWebContent, error) {
 		Category:         category,
 		Matches:          findings,
 		Screenshot:       encodedScreenshot,
+		Entities:         entities,
 	}
 
 	return result, nil
@@ -103,67 +127,100 @@ func cleanContent(raw string) string {
 	return strings.Join(strings.Fields(raw), " ")
 }
 
-func AnalyzeContent(text string, title string) (int, string, string) {
+func AnalyzeContent(text string, title string) (int, string, string, []models.ExtractedEntity) {
 	textLower := strings.ToLower(text + " " + title)
 	score := 1
 	cat := "General Info"
 	var foundList []string
 
+	var entities []models.ExtractedEntity
+
 	keywords := map[string]int{
-		"hacked": 5, "leaked": 6, "database": 6, "dump": 5, "sql injection": 7,
-		"drug": 7, "cocaine": 8, "weed": 4, "market": 5, "cartel": 8,
-		"passport": 9, "id card": 9, "ssn": 10, "cc": 8, "cvv": 9, "fullz": 10,
-		"weapon": 8, "gun": 8, "glock": 7, "hitman": 10,
-		"ddos": 6, "botnet": 7, "exploit": 7, "0day": 9, "malware": 8, "ransomware": 9,
-		"def con": 3, "conference": 2, "security": 2,
+		// Data breaches & hacking
+		"hacked": 8, "breached": 8, "leaked": 9, "data dump": 9, "stolen data": 9,
+		"sql injection": 10, "vulnerability": 6, "zero day": 9, "exploit kit": 9,
+		"credential stuffing": 9, "phishing": 7,
+
+		// Illegal drugs & substances
+		"cocaine": 10, "heroin": 10, "methamphetamine": 10, "fentanyl": 10,
+		"ketamine": 9, "mdma": 8, "lsd": 8, "darknet drug": 10,
+
+		// Dark markets & illegal commerce
+		"dark market": 10, "black market": 10, "darknet market": 10,
+		"for sale": 3, "marketplace": 2, // Low score - too generic
+
+		// Stolen identities & financial fraud
+		"passport": 10, "id card": 9, "ssn": 10, "social security": 10,
+		"cc number": 10, "credit card": 8, "cvv": 9, "fullz": 10,
+		"bank account": 9, "routing number": 9, "identity theft": 10,
+
+		// Weapons & violence
+		"weapon": 9, "gun": 7, "rifle": 8, "pistol": 8, "explosives": 10,
+		"bomb": 10, "hitman": 10, "assassination": 10, "cartel": 10,
+
+		// Cyber attacks & malware
+		"ddos": 8, "botnet": 9, "malware": 9, "ransomware": 10, "spyware": 9,
+		"trojan": 8, "worm": 7, "virus": 6, "keylogger": 9,
+
+		// Illegal content
+		"illegal content": 10, "forbidden": 7, "restricted": 5,
+
+		// Low scoring (benign)
+		"conference": 1, "security": 1, "forum": 2, "database": 3,
 	}
 
+	// \b means word limit. So if you're looking for "cc", you won't get the content of "success".
+	// It only takes the word "cc" written separately.
 	for word, points := range keywords {
-		if strings.Contains(textLower, word) {
+		regex := regexp.MustCompile(`\b` + regexp.QuoteMeta(word) + `\b`)
+
+		if regex.MatchString(textLower) {
 			score += points
-			// Let's add risky keywords to the intelligence list as well, so we can why it's given a score.
 			if points >= 5 {
 				foundList = append(foundList, "Keyword: "+word)
 			}
 		}
 	}
 
-	// finding email
-	emails := emailRegex.FindAllString(text, -1)
-	if len(emails) > 0 {
-		score += 3 // first 3 email recording, because memory inflatable.
-		foundList = append(foundList, fmt.Sprintf("Emails: %v", uniqueStrings(emails)))
-		cat = "Communication / Leaks"
+	// Entity extraction helper
+	extract := func(regex *regexp.Regexp, typeName string, points int) {
+		matches := regex.FindAllString(text, -1)
+
+		// Do unique
+		seen := make(map[string]bool)
+		for _, m := range matches {
+			if !seen[m] {
+				seen[m] = true
+				entities = append(entities, models.ExtractedEntity{Type: typeName, Value: m})
+				if len(seen) <= 3 {
+					foundList = append(foundList, fmt.Sprintf("%s: %s", typeName, m))
+				}
+			}
+		}
+		if len(matches) > 0 {
+			score += points
+			if typeName == "BTC_WALLET" || typeName == "XMR_WALLET" {
+				cat = "Financial / Market"
+			}
+		}
+
 	}
 
-	// finding crypto wallet
-	btc := btcRegex.FindAllString(text, -1)
-	eth := ethRegex.FindAllString(text, -1)
-	xmr := xmrRegex.FindAllString(text, -1)
+	extract(emailRegex, "EMAIL", 3)
+	extract(btcRegex, "BTC_WALLET", 5)
+	extract(xmrRegex, "XMR_WALLET", 6)
+	extract(ethRegex, "ETH_WALLET", 4)
+	extract(gaRegex, "TRACKING_ID", 8)
 
-	if len(btc) > 0 || len(eth) > 0 || len(xmr) > 0 {
-		score += 4
-		cat = "Financial"
-		if len(btc) > 0 {
-			foundList = append(foundList, fmt.Sprintf("BTC: %v", uniqueStrings(btc)))
-		}
-		if len(eth) > 0 {
-			foundList = append(foundList, fmt.Sprintf("ETH: %v", uniqueStrings(eth)))
-		}
-		if len(xmr) > 0 {
-			foundList = append(foundList, fmt.Sprintf("XMR: %v", uniqueStrings(xmr)))
-		}
-	}
-
-	onions := onionRegex.FindAllString(text, -1)
-	if len(onions) > 5 { // If much have links, it would be a "link list" site.
-		foundList = append(foundList, fmt.Sprintf("Found %d Onion Links", len(onions)))
+	if pgpRegex.MatchString(text) {
+		score += 2
+		foundList = append(foundList, "PGP Key Detected")
+		entities = append(entities, models.ExtractedEntity{Type: "PGP_KEY", Value: "PGP Block Present"})
 	}
 
 	if score > 10 {
 		score = 10
 	}
-
 	if score >= 8 {
 		cat = "Critical Threat"
 	} else if score >= 5 {
@@ -171,12 +228,11 @@ func AnalyzeContent(text string, title string) (int, string, string) {
 	}
 
 	matchesStr := strings.Join(foundList, " | ")
-
 	if len(matchesStr) > 500 {
 		matchesStr = matchesStr[:497] + "..."
 	}
 
-	return score, cat, matchesStr
+	return score, cat, matchesStr, entities
 
 }
 

@@ -176,6 +176,27 @@
                         {{ else }}
                             <span style="color: #555;">No specific entities found.</span>
                         {{ end }}
+                        {{if .Entities}}
+                        <div class="bx--row" style="margin-top: 1rem; margin-bottom: 2rem;">
+                            <div class="bx--col">
+                                <h4 style="margin-bottom: 0.5rem; color: #0f62fe;">Detected Entities (Intelligence)</h4>
+                                <div style="background-color: #393939; padding: 1rem; border-left: 4px solid #0f62fe;">
+                                    <ul style="list-style-type: none; padding: 0;">
+                                        {{range .Entities}}
+                                        <li style="margin-bottom: 0.5rem; border-bottom: 1px solid #525252; padding-bottom: 0.25rem;">
+                                            <span class="bx--tag bx--tag--cyan">
+                                                {{.Type}}
+                                            </span>
+                                            <span style="font-family: 'IBM Plex Mono', monospace; color: #fff;">
+                                                {{.Value}}
+                                            </span>
+                                        </li>
+                                        {{end}}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        {{end}}
                     </p>
                 </div>
             </div>

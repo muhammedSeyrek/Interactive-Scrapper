@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"interactive-scraper/auth"
 	"interactive-scraper/database"
 	"interactive-scraper/models"
 	"interactive-scraper/reports"
@@ -48,8 +49,15 @@ type Config struct {
 func main() {
 
 	database.InitDB()
-
 	loadTargetsFromYAML()
+
+	adminUser, _ := database.GetUserByUsername("admin")
+	if adminUser == nil {
+		fmt.Println("Admin yok, oluşturuluyor...")
+		hash, _ := auth.HashPassword("admin123")
+		database.CreateUser(&models.User{Username: "admin", PasswordHash: hash, Role: "admin"})
+		fmt.Println("Admin oluşturuldu: admin / admin123")
+	}
 
 	//go startBackgroundScrapping()
 
@@ -70,18 +78,18 @@ func main() {
 
 	http.HandleFunc("/login", LoginHandler)
 	http.HandleFunc("/logout", logoutHandler)
-	http.HandleFunc("/view", authMiddleware(viewHandler))
-	http.HandleFunc("/add-target", authMiddleware(addTargetHandler))
-	http.HandleFunc("/delete-target", authMiddleware(deleteTargetHandler))
-	http.HandleFunc("/targets", authMiddleware(targetsHandler))
-	http.HandleFunc("/scan-now", authMiddleware(scanNowHandler))
-	http.HandleFunc("/deep-scan", authMiddleware(deepScanHandler))
-	http.HandleFunc("/export/json", authMiddleware(exportJSONHandler))
-	http.HandleFunc("/export/pdf", authMiddleware(exportPDFHandler))
-	http.HandleFunc("/graph", authMiddleware(graphPageHandler))
-	http.HandleFunc("/api/graph", authMiddleware(graphDataHandler))
+	http.HandleFunc("/view", auth.Middleware(viewHandler))
+	http.HandleFunc("/add-target", auth.Middleware(addTargetHandler))
+	http.HandleFunc("/delete-target", auth.Middleware(deleteTargetHandler))
+	http.HandleFunc("/targets", auth.Middleware(targetsHandler))
+	http.HandleFunc("/scan-now", auth.Middleware(scanNowHandler))
+	http.HandleFunc("/deep-scan", auth.Middleware(deepScanHandler))
+	http.HandleFunc("/export/json", auth.Middleware(exportJSONHandler))
+	http.HandleFunc("/export/pdf", auth.Middleware(exportPDFHandler))
+	http.HandleFunc("/graph", auth.Middleware(graphPageHandler))
+	http.HandleFunc("/api/graph", auth.Middleware(graphDataHandler))
 
-	http.HandleFunc("/", authMiddleware(dashboardHandler))
+	http.HandleFunc("/", auth.Middleware(dashboardHandler))
 
 	port := ":8080"
 	fmt.Printf("Starting server on port: http://localhost%s\n", port)
@@ -142,6 +150,10 @@ func scanNowHandler(w http.ResponseWriter, r *http.Request) {
 				fmt.Printf("[%s] scan failed: %v\n", t.URL, err)
 			} else {
 				saveErr := database.SaveDarkWebContent(data)
+				if saveErr == nil && data.ID != 0 {
+					database.SaveEntities(data.ID, data.Entities)
+					fmt.Printf(" -> %d entities saved for ID %d\n", len(data.Entities), data.ID)
+				}
 				if saveErr != nil {
 					fmt.Printf("!!! DB SAVE ERROR for %s: %v\n", t.URL, saveErr)
 					database.UpdateTargetStatus(t.ID, "DB Error")
@@ -266,58 +278,36 @@ func viewHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-
-		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-		w.Header().Set("Pragma", "no-cache")
-		w.Header().Set("Expires", "0")
-
-		cookie, err := r.Cookie("session_token")
-		if err != nil || cookie.Value != "logged_in_secure" {
-			fmt.Println("Unauthorized access attempt.")
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
-			return
-		}
-		next(w, r)
-	}
-}
-
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	// Check if already logged in
-	cookie, err := r.Cookie("session_token")
-	if err == nil && cookie.Value == "logged_in_secure" {
+	cookie, err := r.Cookie("auth_token")
+	if err == nil && cookie.Value != "" {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	if r.Method == "POST" {
+		username := r.FormValue("username")
+		password := r.FormValue("password")
+
+		tokenCookie, err := auth.Login(username, password)
+		if err != nil {
+			tmpl, _ := template.ParseFiles("templates/login.html")
+			tmpl.Execute(w, LoginData{Error: "Incorrect username or wrong password!"})
+			return
+		}
+		http.SetCookie(w, tokenCookie)
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 
 	tmpl, _ := template.ParseFiles("templates/login.html")
-
-	if r.Method == "POST" {
-		username := r.FormValue("username")
-		password := r.FormValue("password")
-		if username == AdminUser && password == AdminPass {
-			http.SetCookie(w, &http.Cookie{
-				Name:     "session_token",
-				Value:    "logged_in_secure",
-				Expires:  time.Now().Add(24 * time.Hour),
-				HttpOnly: true,
-				Path:     "/",
-			})
-			fmt.Println("User logged in: ", username)
-			http.Redirect(w, r, "/", http.StatusSeeOther)
-			return
-		} else {
-			tmpl.Execute(w, LoginData{Error: "Invalid credentials"})
-			return
-		}
-	}
 	tmpl.Execute(w, nil)
 }
 
 func logoutHandler(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
-		Name:    "session_token",
+		Name:    "auth_token",
 		Value:   "",
 		Expires: time.Now().Add(-1 * time.Hour),
 		MaxAge:  -1,
@@ -420,11 +410,16 @@ func deepScanHandler(w http.ResponseWriter, r *http.Request) {
 		go func(t models.Target) {
 
 			mainResult, err := scraper.ScrapeURL(t.URL)
-			if err != nil {
+			if err != nil && mainResult.ID != 0 {
 				database.UpdateTargetStatus(t.ID, "Failed")
 				return
 			}
-			database.SaveDarkWebContent(mainResult)
+			saveErr := database.SaveDarkWebContent(mainResult)
+
+			if saveErr == nil && t.ID != 0 {
+				database.SaveEntities(mainResult.ID, mainResult.Entities)
+				fmt.Printf(" -> %d entities saved for ID %d\n", len(mainResult.Entities), mainResult.ID)
+			}
 
 			links := scraper.ExtractOnionLinks(mainResult.Content, t.URL)
 

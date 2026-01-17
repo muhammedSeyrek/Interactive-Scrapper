@@ -11,3 +11,22 @@ CREATE TABLE IF NOT EXISTS dark_web_contents (
     category VARCHAR(100),                 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP 
 );
+
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    role VARCHAR(20) DEFAULT 'admin', 
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS entities (
+    id SERIAL PRIMARY KEY,
+    content_id INT REFERENCES dark_web_contents(id) ON DELETE CASCADE,
+    entity_type VARCHAR(50), -- ex: 'BTC_WALLET', 'EMAIL', 'PGP_KEY', 'GA_ID'
+    entity_value TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- we have to enhance for db performance.
+CREATE INDEX idx_entity_value ON entities(entity_value);

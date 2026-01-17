@@ -5,17 +5,18 @@ import (
 )
 
 type DarkWebContent struct {
-	ID               int       `json:"id"`
-	SourceName       string    `json:"source_name"`       //
-	SourceURL        string    `json:"source_url"`        //
-	Content          string    `json:"content"`           //
-	Title            string    `json:"title"`             //
-	PublishedDate    time.Time `json:"published_date"`    //
-	CriticalityScore int       `json:"criticality_score"` //
-	Category         string    `json:"category"`          //
-	CreatedAt        time.Time `json:"created_at"`        //
-	Matches          string    `json:"matches"`           //
-	Screenshot       string    `json:"screenshot"`        //
+	ID               int               `json:"id"`
+	SourceName       string            `json:"source_name"`       //
+	SourceURL        string            `json:"source_url"`        //
+	Content          string            `json:"content"`           //
+	Title            string            `json:"title"`             //
+	PublishedDate    time.Time         `json:"published_date"`    //
+	CriticalityScore int               `json:"criticality_score"` //
+	Category         string            `json:"category"`          //
+	CreatedAt        time.Time         `json:"created_at"`        //
+	Matches          string            `json:"matches"`           //
+	Screenshot       string            `json:"screenshot"`        //
+	Entities         []ExtractedEntity `json:"entities"`          //
 }
 
 type Target struct {
@@ -35,6 +36,21 @@ type GraphNode struct {
 }
 
 type GraphEdge struct {
-	From string `json:"from"`
-	To   string `json:"to"`
+	From   string `json:"from"`
+	To     string `json:"to"`
+	Color  string `json:"color"`
+	Dashes bool   `json:"dashes"`
+	Label  string `json:"label"`
+}
+
+type User struct {
+	ID           int    `json:"id"`
+	Username     string `json:"username"`
+	PasswordHash string `json:"password_hash"`
+	Role         string `json:"role"`
+}
+
+type ExtractedEntity struct {
+	Type  string
+	Value string
 }

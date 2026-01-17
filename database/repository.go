@@ -19,9 +19,9 @@ func UpdateContent(id int, score int, category string) error {
 
 func GetContentByID(id int) (*models.DarkWebContent, error) {
 	query := `
-    SELECT id, source_name, source_url, content, title, published_date, criticality_score, category, matches, COALESCE(screenshot, '')
-    FROM dark_web_contents 
-    WHERE id = $1`
+	SELECT id, source_name, source_url, content, title, published_date, criticality_score, category, matches, COALESCE(screenshot, '')
+	FROM dark_web_contents 
+	WHERE id = $1`
 
 	var c models.DarkWebContent
 
@@ -32,6 +32,18 @@ func GetContentByID(id int) (*models.DarkWebContent, error) {
 
 	if err != nil {
 		return nil, err
+	}
+
+	entityQuery := `SELECT entity_type, entity_value FROM entities WHERE content_id = $1`
+	rows, err := DB.Query(entityQuery, id)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var e models.ExtractedEntity
+			if err := rows.Scan(&e.Type, &e.Value); err == nil {
+				c.Entities = append(c.Entities, e)
+			}
+		}
 	}
 
 	return &c, nil
@@ -183,10 +195,11 @@ func AddLinkRelationship(source string, target string) error {
 }
 
 func GetGraphData() ([]models.GraphNode, []models.GraphEdge, error) {
+
 	nodeQuery := `
-        SELECT DISTINCT ON (source_url) source_url, title, criticality_score, category 
-        FROM dark_web_contents 
-        ORDER BY source_url, published_date DESC`
+		SELECT DISTINCT ON (source_url) source_url, title, criticality_score, category 
+		FROM dark_web_contents 
+		ORDER BY source_url, published_date DESC`
 
 	rows, err := DB.Query(nodeQuery)
 	if err != nil {
@@ -200,24 +213,71 @@ func GetGraphData() ([]models.GraphNode, []models.GraphEdge, error) {
 		if err := rows.Scan(&n.ID, &n.Label, &n.Value, &n.Group); err != nil {
 			continue
 		}
+
+		if len(n.Label) > 20 {
+			n.Label = n.Label[:20] + "..."
+		}
 		nodes = append(nodes, n)
 	}
 
-	edgeQuery := `SELECT source_url, target_url FROM link_relationships`
-	edgeRows, err := DB.Query(edgeQuery)
-	if err != nil {
-		return nil, nil, err
-	}
-	defer edgeRows.Close()
-
 	var edges []models.GraphEdge
-	for edgeRows.Next() {
-		var e models.GraphEdge
-		if err := edgeRows.Scan(&e.From, &e.To); err != nil {
-			continue
+
+	linkQuery := `SELECT source_url, target_url FROM link_relationships`
+	linkRows, err := DB.Query(linkQuery)
+	if err == nil {
+		defer linkRows.Close()
+		for linkRows.Next() {
+			var e models.GraphEdge
+			linkRows.Scan(&e.From, &e.To)
+			e.Color = "#0f62fe"
+			e.Dashes = false
+			edges = append(edges, e)
 		}
-		edges = append(edges, e)
+	}
+
+	sharedQuery := `
+		SELECT t1.source_url, t2.source_url, e1.entity_type
+		FROM entities e1
+		JOIN entities e2 ON e1.entity_value = e2.entity_value AND e1.id != e2.id
+		JOIN dark_web_contents t1 ON e1.content_id = t1.id
+		JOIN dark_web_contents t2 ON e2.content_id = t2.id
+		WHERE t1.source_url < t2.source_url -- Mükerrer (A-B ve B-A) kayıtları önler
+		GROUP BY t1.source_url, t2.source_url, e1.entity_type
+	`
+
+	sharedRows, err := DB.Query(sharedQuery)
+	if err == nil {
+		defer sharedRows.Close()
+		for sharedRows.Next() {
+			var from, to, eType string
+			sharedRows.Scan(&from, &to, &eType)
+
+			edges = append(edges, models.GraphEdge{
+				From:   from,
+				To:     to,
+				Color:  "#da1e28",
+				Dashes: true,
+				Label:  eType,
+			})
+		}
 	}
 
 	return nodes, edges, nil
+}
+
+func SaveEntities(contentID int, entities []models.ExtractedEntity) error {
+	if len(entities) == 0 {
+		return nil
+	}
+
+	query := `INSERT INTO entities (content_id, entity_type, entity_value) VALUES ($1, $2, $3)`
+
+	for _, e := range entities {
+		_, err := DB.Exec(query, contentID, e.Type, e.Value)
+		if err != nil {
+			log.Printf("Entity save error (%s): %v", e.Type, err)
+
+		}
+	}
+	return nil
 }
