@@ -1,3 +1,4 @@
 targets:
-  - "https://check.torproject.org/"
-  - "http://danielas3rtn54uwmofbg95bwyzb3uqqqra2nbv3zunnuefbq7k4vcad.onion/"
+  - "https://check.torproject.org/" # for check
+  - "http://wiki6dtqpuvwtc5hopuj33eeavwa6sik7sy57cor35chkx5nrbmmolqd.onion/"
+  - "http://torwikijwqskahohtn35pyfde2uqmgrxgr2fru4mn4rer5muj445dxyd.onion/"

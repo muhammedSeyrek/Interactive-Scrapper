@@ -23,6 +23,8 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./init-admin.sql:/docker-entrypoint-initdb.d/02-init-admin.sql
     networks:
       - cti_net
     healthcheck: 
@@ -47,6 +49,8 @@ services:
         condition: service_started
     networks:
       - cti_net
+
+  
 
 volumes:
   postgres_data:

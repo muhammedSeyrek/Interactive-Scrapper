@@ -79,3 +79,7 @@ func Middleware(next http.HandlerFunc) http.HandlerFunc {
 		next(w, r)
 	}
 }
+
+func GetJWTKey() []byte {
+	return jwtKey
+}

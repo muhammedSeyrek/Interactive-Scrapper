@@ -8,7 +8,9 @@ CREATE TABLE IF NOT EXISTS dark_web_contents (
     title VARCHAR(255),                     
     published_date TIMESTAMP,              
     criticality_score INT DEFAULT 0,        
-    category VARCHAR(100),                 
+    category VARCHAR(100),
+    matches TEXT, 
+    screenshot TEXT,                 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP 
 );
 
@@ -25,6 +27,15 @@ CREATE TABLE IF NOT EXISTS entities (
     content_id INT REFERENCES dark_web_contents(id) ON DELETE CASCADE,
     entity_type VARCHAR(50), -- ex: 'BTC_WALLET', 'EMAIL', 'PGP_KEY', 'GA_ID'
     entity_value TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS targets (
+    id SERIAL PRIMARY KEY,
+    url TEXT NOT NULL UNIQUE,
+    source VARCHAR(50),
+    last_status VARCHAR(100) DEFAULT 'Pending',
+    last_scanned_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

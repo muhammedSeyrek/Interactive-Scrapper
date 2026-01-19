@@ -253,29 +253,49 @@ func uniqueStrings(input []string) []string {
 }
 
 func ExtractOnionLinks(htmlContent string, baseURL string) []string {
-	// Basic href regex
-	linkRegex := regexp.MustCompile(`href=["'](.*?)["']`)
+	var links []string
+
+	linkRegex := regexp.MustCompile(`href\s*=\s*["']([^"']+)["']`)
 	matches := linkRegex.FindAllStringSubmatch(htmlContent, -1)
 
-	var links []string
-	base, _ := url.Parse(baseURL)
+	base, err := url.Parse(baseURL)
+	if err != nil {
+		return links
+	}
+
+	seen := make(map[string]bool)
 
 	for _, match := range matches {
-		link := match[1]
+		rawLink := strings.TrimSpace(match[1])
 
-		if strings.HasPrefix(link, "/") {
-			link = fmt.Sprintf("%s://%s%s", base.Scheme, base.Host, link)
-		} else if !strings.HasPrefix(link, "http") {
-
+		if rawLink == "" || strings.HasPrefix(rawLink, "#") || strings.HasPrefix(rawLink, "javascript:") || strings.HasPrefix(rawLink, "mailto:") {
 			continue
 		}
 
-		if strings.Contains(link, base.Host) && strings.Contains(link, ".onion") {
+		var fullURL string
 
-			if link != baseURL {
-				links = append(links, link)
+		if strings.HasPrefix(rawLink, "http") {
+			fullURL = rawLink
+		} else if strings.HasPrefix(rawLink, "//") {
+			fullURL = base.Scheme + ":" + rawLink
+		} else {
+			// Path birleştirme
+			rel, err := url.Parse(rawLink)
+			if err == nil {
+				fullURL = base.ResolveReference(rel).String()
+			} else {
+				continue
+			}
+		}
+
+		if strings.Contains(fullURL, ".onion") {
+			if strings.Contains(fullURL, base.Host) {
+				if fullURL != baseURL && !seen[fullURL] {
+					links = append(links, fullURL)
+					seen[fullURL] = true
+				}
 			}
 		}
 	}
-	return uniqueStrings(links)
+	return links
 }

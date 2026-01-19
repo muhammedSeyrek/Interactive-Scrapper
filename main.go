@@ -13,14 +13,11 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"gopkg.in/yaml.v3"
-)
-
-const (
-	AdminUser = "admin"
-	AdminPass = "admin"
 )
 
 type LoginData struct {
@@ -53,26 +50,46 @@ func main() {
 
 	adminUser, _ := database.GetUserByUsername("admin")
 	if adminUser == nil {
-		fmt.Println("Admin yok, oluşturuluyor...")
-		hash, _ := auth.HashPassword("admin123")
-		database.CreateUser(&models.User{Username: "admin", PasswordHash: hash, Role: "admin"})
-		fmt.Println("Admin oluşturuldu: admin / admin123")
+		log.Fatal("Admin user not found in database - check schema.sql initialization")
 	}
 
-	//go startBackgroundScrapping()
+	go startAutomaticScanning()
 
 	go func() {
 		time.Sleep(20 * time.Second)
 		contents, _ := database.GetAllContent()
 		if len(contents) == 0 {
-			fmt.Println("Database is empty, starting initial scrape...")
-			url := "http://check.torproject.org" // Replace with actual .onion URL
-			data, err := scraper.ScrapeURL(url)
-			if err == nil {
-				database.SaveDarkWebContent(data)
-			} else {
-				fmt.Println("Initial scrape failed: ", err)
+			fmt.Println("[INIT] Database is empty, starting initial scrape from targets...")
+			targets, err := database.GetAllTargets()
+			if err != nil || len(targets) == 0 {
+				fmt.Println("[INIT] No targets found")
+				return
 			}
+
+			// Scan first 3 targets
+			maxTargets := 3
+			if len(targets) < maxTargets {
+				maxTargets = len(targets)
+			}
+
+			for i := 0; i < maxTargets; i++ {
+				target := targets[i]
+				fmt.Printf("[INIT] Scanning: %s\n", target.URL)
+
+				data, err := scraper.ScrapeURL(target.URL)
+				if err == nil {
+					database.SaveDarkWebContent(data)
+					if data.ID != 0 {
+						database.SaveEntities(data.ID, data.Entities)
+					}
+					fmt.Printf("[INIT] Saved: %s\n", target.URL)
+				} else {
+					fmt.Printf("[INIT] Failed: %s - %v\n", target.URL, err)
+				}
+
+				time.Sleep(5 * time.Second) // Rate limiting
+			}
+			fmt.Println("[INIT] Initial scrape completed")
 		}
 	}()
 
@@ -88,7 +105,11 @@ func main() {
 	http.HandleFunc("/export/pdf", auth.Middleware(exportPDFHandler))
 	http.HandleFunc("/graph", auth.Middleware(graphPageHandler))
 	http.HandleFunc("/api/graph", auth.Middleware(graphDataHandler))
-
+	// API endpoints - Protected with auth
+	http.HandleFunc("/api/targets", apiMiddleware(apiTargetsHandler))
+	http.HandleFunc("/api/scan", apiMiddleware(apiScanHandler))
+	http.HandleFunc("/api/content", apiMiddleware(apiContentHandler))
+	http.HandleFunc("/api/changes", apiMiddleware(apiChangesHandler))
 	http.HandleFunc("/", auth.Middleware(dashboardHandler))
 
 	port := ":8080"
@@ -166,47 +187,6 @@ func scanNowHandler(w http.ResponseWriter, r *http.Request) {
 
 	}
 	http.Redirect(w, r, "/targets", http.StatusSeeOther)
-}
-
-func startBackgroundScrapping() {
-	fmt.Println("Tor service is started.... wait for 30 second...")
-	time.Sleep(10 * time.Second)
-
-	for {
-		targets, err := database.GetAllTargets()
-		if err != nil {
-			fmt.Println("Targets were not achieved:", err)
-			time.Sleep(1 * time.Minute)
-			continue
-		}
-		if len(targets) == 0 {
-			fmt.Println("No targets to scan. Wait for 1 minute...")
-			continue
-		}
-
-		fmt.Println("%d number of targets are being scanned...\n", len(targets))
-
-		for _, t := range targets {
-			fmt.Println("Scanning: %s\n", t.URL)
-
-			database.UpdateTargetStatus(t.ID, "Scanning...")
-
-			data, err := scraper.ScrapeURL(t.URL)
-			if err == nil {
-				database.SaveDarkWebContent(data)
-				database.UpdateTargetStatus(t.ID, "Online")
-				fmt.Println("Recorded.")
-			} else {
-				fmt.Println("Scan failed: %v\n", err)
-				database.UpdateTargetStatus(t.ID, "Failed")
-			}
-
-			time.Sleep(15 * time.Second)
-		}
-
-		fmt.Println("Entire list was scan. 5 minute break...")
-		time.Sleep(5 * time.Minute)
-	}
 }
 
 func addTargetHandler(w http.ResponseWriter, r *http.Request) {
@@ -536,4 +516,252 @@ func graphPageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	tmpl.Execute(w, nil)
+}
+
+// Background scanner runs automatically every 6 hours
+func startAutomaticScanning() {
+	fmt.Println("[BACKGROUND] Scanner initialized. Will scan every 6 hours...")
+	ticker := time.NewTicker(6 * time.Hour)
+	defer ticker.Stop()
+
+	// First scan after 2 minutes startup
+	time.Sleep(2 * time.Minute)
+	performBackgroundScan()
+
+	for range ticker.C {
+		fmt.Println("[BACKGROUND] 6-hour interval reached. Starting scan...")
+		performBackgroundScan()
+	}
+}
+
+// performBackgroundScan scans all targets and detects changes
+func performBackgroundScan() {
+	targets, err := database.GetAllTargets()
+	if err != nil {
+		fmt.Printf("[BACKGROUND] Error fetching targets: %v\n", err)
+		return
+	}
+
+	if len(targets) == 0 {
+		fmt.Println("[BACKGROUND] No targets to scan")
+		return
+	}
+
+	fmt.Printf("[BACKGROUND] Starting scan of %d targets...\n", len(targets))
+
+	var wg sync.WaitGroup
+	for _, t := range targets {
+		wg.Add(1)
+		go func(target models.Target) {
+			defer wg.Done()
+			scanTargetWithDiff(target)
+		}(t)
+	}
+
+	wg.Wait()
+	fmt.Println("[BACKGROUND] Scan cycle completed")
+}
+
+// scanTargetWithDiff scans a target and detects new entities
+func scanTargetWithDiff(target models.Target) {
+	database.UpdateTargetStatus(target.ID, "Auto-Scanning...")
+
+	data, err := scraper.ScrapeURL(target.URL)
+	if err != nil {
+		fmt.Printf("[BACKGROUND] Scan failed for %s: %v\n", target.URL, err)
+		database.UpdateTargetStatus(target.ID, "Failed")
+		return
+	}
+
+	// Get previous scan to detect changes
+	prevScan, _ := database.GetPreviousScan(target.URL, time.Now())
+	var newEntities []models.EntityChange
+
+	if prevScan != nil {
+		newEntities = database.DetectNewEntities(data.Entities, prevScan.Entities)
+		if len(newEntities) > 0 {
+			fmt.Printf("[BACKGROUND] %s: Found %d NEW entities!\n", target.URL, len(newEntities))
+			for _, e := range newEntities {
+				fmt.Printf("  -> [%s] %s\n", e.Type, e.Value)
+			}
+		}
+	}
+
+	// Save current scan
+	saveErr := database.SaveDarkWebContent(data)
+	if saveErr == nil && data.ID != 0 {
+		database.SaveEntities(data.ID, data.Entities)
+		database.UpdateTargetStatus(target.ID, "Online")
+	} else {
+		database.UpdateTargetStatus(target.ID, "DB Error")
+	}
+
+	time.Sleep(10 * time.Second) // Rate limiting
+}
+
+// API Endpoints (JSON responses for programmatic access)
+
+// apiTargetsHandler returns all targets as JSON
+func apiTargetsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	targets, err := database.GetAllTargets()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	json.NewEncoder(w).Encode(targets)
+}
+
+// apiContentHandler returns content with optional filtering
+func apiContentHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	query := r.URL.Query().Get("q")
+	var contents []models.DarkWebContent
+	var err error
+
+	if query != "" {
+		contents, err = database.SearchContent(query)
+	} else {
+		contents, err = database.GetAllContent()
+	}
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	// Optional: filter by risk level
+	riskLevel := r.URL.Query().Get("risk")
+	if riskLevel != "" {
+		var filtered []models.DarkWebContent
+		for _, c := range contents {
+			level := database.GetRiskLevel(c.CriticalityScore)
+			if level == riskLevel {
+				filtered = append(filtered, c)
+			}
+		}
+		contents = filtered
+	}
+
+	json.NewEncoder(w).Encode(contents)
+}
+
+// apiScanHandler manually triggers a scan for a specific target
+func apiScanHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != "POST" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(map[string]string{"error": "POST required"})
+		return
+	}
+
+	targetID := r.URL.Query().Get("id")
+	id, err := strconv.Atoi(targetID)
+	if err != nil || id == 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Valid target ID required"})
+		return
+	}
+
+	target, err := database.GetTargetByID(id)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Target not found"})
+		return
+	}
+
+	// Trigger scan in background
+	go scanTargetWithDiff(target)
+
+	json.NewEncoder(w).Encode(map[string]string{"status": "Scan started", "target": target.URL})
+}
+
+// apiChangesHandler returns recently detected changes across all scans
+func apiChangesHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	hoursStr := r.URL.Query().Get("hours")
+	hours := 24 // default: last 24 hours
+	if h, err := strconv.Atoi(hoursStr); err == nil && h > 0 {
+		hours = h
+	}
+
+	// Get all recent content from the specified time period
+	query := fmt.Sprintf(`
+    SELECT id, source_url, title, criticality_score, category, published_date
+    FROM dark_web_contents
+    WHERE published_date > NOW() - INTERVAL '%d hours'
+    ORDER BY published_date DESC
+    LIMIT 100
+    `, hours)
+
+	rows, err := database.DB.Query(query)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	var changes []map[string]interface{}
+	for rows.Next() {
+		var id int
+		var url, title, category string
+		var score int
+		var pubDate time.Time
+
+		if err := rows.Scan(&id, &url, &title, &score, &category, &pubDate); err != nil {
+			continue
+		}
+
+		changes = append(changes, map[string]interface{}{
+			"id":       id,
+			"url":      url,
+			"title":    title,
+			"score":    score,
+			"level":    database.GetRiskLevel(score),
+			"category": category,
+			"scanned":  pubDate,
+		})
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"period_hours": hours,
+		"changes":      changes,
+	})
+}
+
+// apiMiddleware checks auth for API endpoints and returns JSON errors
+func apiMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		cookie, err := r.Cookie("auth_token")
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(map[string]string{"error": "unauthorized"})
+			return
+		}
+
+		tokenStr := cookie.Value
+		claims := &auth.Claims{}
+
+		tkn, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
+			return auth.GetJWTKey(), nil
+		})
+
+		if err != nil || !tkn.Valid {
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(map[string]string{"error": "invalid token"})
+			return
+		}
+
+		next(w, r)
+	}
 }

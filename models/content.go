@@ -6,17 +6,17 @@ import (
 
 type DarkWebContent struct {
 	ID               int               `json:"id"`
-	SourceName       string            `json:"source_name"`       //
-	SourceURL        string            `json:"source_url"`        //
-	Content          string            `json:"content"`           //
-	Title            string            `json:"title"`             //
-	PublishedDate    time.Time         `json:"published_date"`    //
-	CriticalityScore int               `json:"criticality_score"` //
-	Category         string            `json:"category"`          //
-	CreatedAt        time.Time         `json:"created_at"`        //
-	Matches          string            `json:"matches"`           //
-	Screenshot       string            `json:"screenshot"`        //
-	Entities         []ExtractedEntity `json:"entities"`          //
+	SourceName       string            `json:"source_name"`
+	SourceURL        string            `json:"source_url"`
+	Content          string            `json:"content"`
+	Title            string            `json:"title"`
+	PublishedDate    time.Time         `json:"published_date"`
+	CriticalityScore int               `json:"criticality_score"`
+	Category         string            `json:"category"`
+	CreatedAt        time.Time         `json:"created_at"`
+	Matches          string            `json:"matches"`
+	Screenshot       string            `json:"screenshot"`
+	Entities         []ExtractedEntity `json:"entities"`
 }
 
 type Target struct {
@@ -51,6 +51,23 @@ type User struct {
 }
 
 type ExtractedEntity struct {
-	Type  string
-	Value string
+	Type  string `json:"type"`
+	Value string `json:"value"`
+}
+
+// For diffing: track new entities detected in latest scan
+type EntityChange struct {
+	Type      string    `json:"type"`
+	Value     string    `json:"value"`
+	IsNew     bool      `json:"is_new"`
+	ScannedAt time.Time `json:"scanned_at"`
+}
+
+type ScanSummary struct {
+	ContentID     int            `json:"content_id"`
+	URL           string         `json:"url"`
+	NewEntities   []EntityChange `json:"new_entities"`
+	TotalEntities int            `json:"total_entities"`
+	Severity      string         `json:"severity"`
+	ScannedAt     time.Time      `json:"scanned_at"`
 }

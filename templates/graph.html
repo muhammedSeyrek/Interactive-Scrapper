@@ -178,13 +178,26 @@
 
             // 2. Edge'leri (Çizgileri) Oluştur
             var edges = new vis.DataSet(
-                apiEdges.map(e => ({
-                    from: e.from,
-                    to: e.to,
-                    arrows: 'to',
-                    color: { color: '#393939', highlight: '#0f62fe' },
-                    width: 1
-                }))
+                apiEdges.map(e => {
+                    // Backend'den gelen renk ve stil ayarlarını uygula
+                    var edgeColor = e.color || '#393939'; // Renk yoksa gri yap
+                    var isDashed = e.dashes || false;     // Kesik çizgi ayarı
+                    
+                    return {
+                        from: e.from,
+                        to: e.to,
+                        arrows: 'to',
+                        color: { 
+                            color: edgeColor, 
+                            highlight: '#0f62fe', // Üzerine gelince parlasın
+                            hover: '#0f62fe'
+                        },
+                        dashes: isDashed, // Kesik çizgi (True/False)
+                        width: isDashed ? 2 : 1, // Önemli bağlantılar daha kalın olsun
+                        label: e.label || "",     // Çizgi üzerinde ne olduğu yazsın (örn: "Shared BTC")
+                        font: { align: 'top', size: 10, color: '#e0e6ed', background: '#12141c' }
+                    };
+                })
             );
 
             var data = { nodes: nodes, edges: edges };

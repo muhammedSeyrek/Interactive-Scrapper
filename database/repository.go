@@ -3,6 +3,7 @@ package database
 import (
 	"interactive-scraper/models"
 	"log"
+	"time"
 )
 
 func UpdateTargetStatus(id int, status string) error {
@@ -280,4 +281,78 @@ func SaveEntities(contentID int, entities []models.ExtractedEntity) error {
 		}
 	}
 	return nil
+}
+
+// GetPreviousScan returns the latest scan for a given URL before current time
+func GetPreviousScan(url string, beforeTime time.Time) (*models.DarkWebContent, error) {
+	query := `
+    SELECT id, source_name, source_url, content, title, published_date, criticality_score, category, matches, COALESCE(screenshot, '')
+    FROM dark_web_contents
+    WHERE source_url = $1 AND published_date < $2
+    ORDER BY published_date DESC
+    LIMIT 1`
+
+	var c models.DarkWebContent
+	err := DB.QueryRow(query, url, beforeTime).Scan(
+		&c.ID, &c.SourceName, &c.SourceURL, &c.Content, &c.Title,
+		&c.PublishedDate, &c.CriticalityScore, &c.Category, &c.Matches, &c.Screenshot,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Load entities for previous scan
+	entityQuery := `SELECT entity_type, entity_value FROM entities WHERE content_id = $1`
+	rows, err := DB.Query(entityQuery, c.ID)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var e models.ExtractedEntity
+			if err := rows.Scan(&e.Type, &e.Value); err == nil {
+				c.Entities = append(c.Entities, e)
+			}
+		}
+	}
+
+	return &c, nil
+}
+
+// DetectNewEntities compares current entities with previous scan and returns only new ones
+func DetectNewEntities(currentEntities []models.ExtractedEntity, previousEntities []models.ExtractedEntity) []models.EntityChange {
+	var newEntities []models.EntityChange
+
+	// Build a map of previous entities for fast lookup
+	prevMap := make(map[string]bool)
+	for _, e := range previousEntities {
+		key := e.Type + ":" + e.Value
+		prevMap[key] = true
+	}
+
+	// Check which current entities are new
+	for _, curr := range currentEntities {
+		key := curr.Type + ":" + curr.Value
+		if !prevMap[key] {
+			newEntities = append(newEntities, models.EntityChange{
+				Type:      curr.Type,
+				Value:     curr.Value,
+				IsNew:     true,
+				ScannedAt: time.Now(),
+			})
+		}
+	}
+
+	return newEntities
+}
+
+// GetRiskLevel determines risk level based on score
+func GetRiskLevel(score int) string {
+	if score >= 8 {
+		return "CRITICAL"
+	} else if score >= 5 {
+		return "HIGH"
+	} else if score >= 3 {
+		return "MEDIUM"
+	}
+	return "LOW"
 }
