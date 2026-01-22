@@ -1,0 +1,63 @@
+[
+  { "keyword": "ransomware", "score": 10, "mitre_id": "T1486", "tactic": "Impact" },
+  { "keyword": "lockbit", "score": 10, "mitre_id": "T1486", "tactic": "Impact" },
+  { "keyword": "blackcat", "score": 10, "mitre_id": "T1486", "tactic": "Impact" },
+  { "keyword": "alphv", "score": 10, "mitre_id": "T1486", "tactic": "Impact" },
+  { "keyword": "play ransomware", "score": 10, "mitre_id": "T1486", "tactic": "Impact" },
+  { "keyword": "cl0p", "score": 10, "mitre_id": "T1486", "tactic": "Impact" },
+  { "keyword": "akira", "score": 10, "mitre_id": "T1486", "tactic": "Impact" },
+  { "keyword": "encrypt", "score": 6, "mitre_id": "T1486", "tactic": "Impact" },
+
+  { "keyword": "sql injection", "score": 10, "mitre_id": "T1190", "tactic": "Initial Access" },
+  { "keyword": "sqli", "score": 9, "mitre_id": "T1190", "tactic": "Initial Access" },
+  { "keyword": "dump", "score": 7, "mitre_id": "T1005", "tactic": "Collection" },
+  
+  { "keyword": "brute force", "score": 8, "mitre_id": "T1110", "tactic": "Credential Access" },
+  { "keyword": "credential stuffing", "score": 9, "mitre_id": "T1110.004", "tactic": "Credential Access" },
+  { "keyword": "combo list", "score": 8, "mitre_id": "T1110", "tactic": "Credential Access" },
+
+  { "keyword": "phishing", "score": 8, "mitre_id": "T1566", "tactic": "Initial Access" },
+  { "keyword": "spearphishing", "score": 9, "mitre_id": "T1566", "tactic": "Initial Access" },
+
+  { "keyword": "powershell", "score": 6, "mitre_id": "T1059.001", "tactic": "Execution" },
+  { "keyword": "cmd.exe", "score": 5, "mitre_id": "T1059.003", "tactic": "Execution" },
+  { "keyword": "bash", "score": 5, "mitre_id": "T1059.004", "tactic": "Execution" },
+
+  { "keyword": "cobalt strike", "score": 10, "mitre_id": "T1071", "tactic": "Command and Control" },
+  { "keyword": "metasploit", "score": 9, "mitre_id": "T1588.002", "tactic": "Resource Development" },
+  { "keyword": "sliver c2", "score": 9, "mitre_id": "T1071", "tactic": "Command and Control" },
+  { "keyword": "havoc c2", "score": 9, "mitre_id": "T1071", "tactic": "Command and Control" },
+  { "keyword": "brute ratel", "score": 10, "mitre_id": "T1071", "tactic": "Command and Control" },
+
+  { "keyword": "mimikatz", "score": 10, "mitre_id": "T1003", "tactic": "Credential Access" },
+  { "keyword": "lasagne", "score": 9, "mitre_id": "T1555", "tactic": "Credential Access" },
+
+  { "keyword": "redline stealer", "score": 10, "mitre_id": "T1555", "tactic": "Credential Access" },
+  { "keyword": "vidar", "score": 10, "mitre_id": "T1555", "tactic": "Credential Access" },
+  { "keyword": "raccoon stealer", "score": 10, "mitre_id": "T1555", "tactic": "Credential Access" },
+  { "keyword": "lumma", "score": 10, "mitre_id": "T1555", "tactic": "Credential Access" },
+  { "keyword": "stealer logs", "score": 9, "mitre_id": "T1555", "tactic": "Credential Access" },
+
+  { "keyword": "webshell", "score": 10, "mitre_id": "T1505.003", "tactic": "Persistence" },
+  { "keyword": "c99", "score": 9, "mitre_id": "T1505.003", "tactic": "Persistence" },
+  { "keyword": "r57", "score": 9, "mitre_id": "T1505.003", "tactic": "Persistence" },
+  { "keyword": "shell upload", "score": 9, "mitre_id": "T1190", "tactic": "Initial Access" },
+
+  { "keyword": "rdp access", "score": 10, "mitre_id": "T1078", "tactic": "Initial Access" },
+  { "keyword": "vpn access", "score": 10, "mitre_id": "T1078", "tactic": "Initial Access" },
+  { "keyword": "cpanel access", "score": 9, "mitre_id": "T1078", "tactic": "Initial Access" },
+  { "keyword": "root access", "score": 10, "mitre_id": "T1078", "tactic": "Initial Access" },
+
+  { "keyword": "exploit", "score": 8, "mitre_id": "T1588.005", "tactic": "Resource Development" },
+  { "keyword": "zero day", "score": 10, "mitre_id": "T1588.005", "tactic": "Resource Development" },
+  { "keyword": "0day", "score": 10, "mitre_id": "T1588.005", "tactic": "Resource Development" },
+  { "keyword": "cve-", "score": 9, "mitre_id": "T1190", "tactic": "Initial Access" },
+
+  { "keyword": "botnet", "score": 9, "mitre_id": "T1583", "tactic": "Resource Development" },
+  { "keyword": "mirai", "score": 9, "mitre_id": "T1583", "tactic": "Resource Development" },
+
+  { "keyword": "ssn", "score": 10, "mitre_id": "T1592", "tactic": "Reconnaissance" },
+  { "keyword": "fullz", "score": 10, "mitre_id": "T1592", "tactic": "Reconnaissance" },
+  { "keyword": "cvv", "score": 10, "mitre_id": "T1592", "tactic": "Reconnaissance" },
+  { "keyword": "credit card", "score": 9, "mitre_id": "T1592", "tactic": "Reconnaissance" }
+]

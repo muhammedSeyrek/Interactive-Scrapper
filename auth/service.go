@@ -3,13 +3,22 @@ package auth
 import (
 	"interactive-scraper/database"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
-var jwtKey = []byte("secret_key_might_is_changed")
+var jwtKey = []byte(getJwtSecret())
+
+func getJwtSecret() string {
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		return "varsayilan_ama_guvensiz_anahtar" // Sadece test için
+	}
+	return secret
+}
 
 type Claims struct {
 	Username string `json:"username"`

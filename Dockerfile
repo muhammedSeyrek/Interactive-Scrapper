@@ -19,6 +19,7 @@ RUN apk add --no-cache chromium ca-certificates
 COPY --from=builder /app/interactive-scraper .
 COPY --from=builder /app/templates ./templates
 COPY --from=builder /app/targets.yaml .
+COPY --from=builder /app/mitre_rules.json .
 
 EXPOSE 8080
 

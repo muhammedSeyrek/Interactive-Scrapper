@@ -1,0 +1,8 @@
+.env
+postgres_data/
+__debug_bin
+*.exe
+*.log
+.DS_Store
+.idea/
+.vscode/

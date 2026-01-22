@@ -3,8 +3,10 @@ package scraper
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"interactive-scraper/models"
+	"io/ioutil"
 	"net/url"
 	"os"
 	"regexp"
@@ -13,6 +15,21 @@ import (
 
 	"github.com/chromedp/chromedp"
 )
+
+type JsonRule struct {
+	Keyword string `json:"keyword"`
+	Score   int    `json:"score"`
+	MitreID string `json:"mitre_id"`
+	Tactic  string `json:"tactic"`
+}
+
+type ThreatRule struct {
+	Score   int
+	MitreID string
+	Tactic  string
+}
+
+var loadedRules map[string]ThreatRule
 
 // Regex definition for previous compiled to performance
 var (
@@ -27,7 +44,49 @@ var (
 	gaRegex = regexp.MustCompile(`\b(UA-\d+-\d+|G-[A-Z0-9]+|GTM-[A-Z0-9]+)\b`)
 	// PGP Key Block
 	pgpRegex = regexp.MustCompile(`-----BEGIN PGP PUBLIC KEY BLOCK-----`)
+	// IP Regex
+	ipRegex = regexp.MustCompile(`\b(?:\d{1,3}\.){3}\d{1,3}\b`)
 )
+
+func init() {
+	loadRulesFromFile("mitre_rules.json")
+}
+
+func loadRulesFromFile(filename string) {
+	loadedRules = make(map[string]ThreatRule)
+
+	file, err := ioutil.ReadFile(filename)
+	if err != nil {
+		fmt.Printf("[WARNING] MITRE rules file not found (%s). Using empty rules.\n", filename)
+		return
+	}
+
+	var jsonRules []JsonRule
+	if err := json.Unmarshal(file, &jsonRules); err != nil {
+		fmt.Printf("[ERROR] Failed to parse MITRE rules: %v\n", err)
+		return
+	}
+
+	for _, r := range jsonRules {
+		loadedRules[r.Keyword] = ThreatRule{
+			Score:   r.Score,
+			MitreID: r.MitreID,
+			Tactic:  r.Tactic,
+		}
+	}
+	fmt.Printf("[INIT] Loaded %d MITRE rules from %s\n", len(loadedRules), filename)
+}
+
+// getThreatRules artık hafızadaki yüklü kuralları döndürür
+func getThreatRules() map[string]ThreatRule {
+	if len(loadedRules) == 0 {
+		// Dosya yoksa veya boşsa yedek (fallback) birkaç kural
+		return map[string]ThreatRule{
+			"hacked": {6, "GENERIC", "Indicator"},
+		}
+	}
+	return loadedRules
+}
 
 func ScrapeURL(targetURL string) (*models.DarkWebContent, error) {
 

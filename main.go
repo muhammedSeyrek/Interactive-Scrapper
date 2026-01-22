@@ -9,9 +9,11 @@ import (
 	"interactive-scraper/models"
 	"interactive-scraper/reports"
 	"interactive-scraper/scraper"
+	"interactive-scraper/services"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -47,11 +49,6 @@ func main() {
 
 	database.InitDB()
 	loadTargetsFromYAML()
-
-	adminUser, _ := database.GetUserByUsername("admin")
-	if adminUser == nil {
-		log.Fatal("Admin user not found in database - check schema.sql initialization")
-	}
 
 	go startAutomaticScanning()
 
@@ -562,10 +559,37 @@ func performBackgroundScan() {
 	fmt.Println("[BACKGROUND] Scan cycle completed")
 }
 
-// scanTargetWithDiff scans a target and detects new entities
+// scanTargetWithDiff scans a target, checks URL reputation, detects changes, and enriches data with VirusTotal
+
 func scanTargetWithDiff(target models.Target) {
+	// ---------------------------------------------------------
+	// CONFIGURATION (Sensitive data should ideally be in env vars)
+	// ---------------------------------------------------------
+	apiKey := os.Getenv("VIRUSTOTAL_API_KEY")
+	slackWebhook := os.Getenv("SLACK_WEBHOOK_URL")
+
+	if apiKey == "" || slackWebhook == "" {
+		fmt.Println("[WARNING] API Key or Webhook URL not set in environment variables!")
+	}
+
+	// STEP 1: Check Target URL Reputation (Domain Level)
+	// Before scraping, ask VirusTotal if the site itself is malicious.
+	fmt.Printf("[VT] Checking reputation for: %s\n", target.URL)
+	vtUrlReport, badUrlScore, _ := services.CheckURLReputation(target.URL, apiKey)
+
+	if badUrlScore > 0 {
+		fmt.Printf("🚨 DANGER! The target URL itself is malicious! (%d engines flagged it)\n", badUrlScore)
+
+		// Immediate Alert for Malicious Domain
+		details := fmt.Sprintf("🔴 DOMAIN BLOCKED BY VIRUSTOTAL!\nReport: %s", vtUrlReport)
+		reports.SendSlackAlert(slackWebhook, target.URL+" (MALICIOUS DOMAIN DETECTED)", 10, 0, details)
+	} else {
+		fmt.Printf("[VT] Target seems clean: %s\n", vtUrlReport)
+	}
+
 	database.UpdateTargetStatus(target.ID, "Auto-Scanning...")
 
+	// STEP 2: Scrape the Target Content
 	data, err := scraper.ScrapeURL(target.URL)
 	if err != nil {
 		fmt.Printf("[BACKGROUND] Scan failed for %s: %v\n", target.URL, err)
@@ -573,21 +597,59 @@ func scanTargetWithDiff(target models.Target) {
 		return
 	}
 
-	// Get previous scan to detect changes
+	// If the URL itself was malicious, force high risk score
+	if badUrlScore > 0 {
+		data.CriticalityScore = 10
+		data.Category = "Known Malicious Site"
+	}
+
+	// STEP 3: Change Detection (Diffing)
 	prevScan, _ := database.GetPreviousScan(target.URL, time.Now())
 	var newEntities []models.EntityChange
 
 	if prevScan != nil {
 		newEntities = database.DetectNewEntities(data.Entities, prevScan.Entities)
-		if len(newEntities) > 0 {
-			fmt.Printf("[BACKGROUND] %s: Found %d NEW entities!\n", target.URL, len(newEntities))
-			for _, e := range newEntities {
-				fmt.Printf("  -> [%s] %s\n", e.Type, e.Value)
+
+		// Alert Condition: High Risk Score OR New Entities Found
+		if len(newEntities) > 0 || data.CriticalityScore >= 5 {
+
+			fmt.Printf("[BACKGROUND] Alert Triggered for %s (Score: %d, New: %d)\n", target.URL, data.CriticalityScore, len(newEntities))
+
+			// --- BUILD INTELLIGENCE REPORT ---
+			reportDetails := fmt.Sprintf("📋 **Findings:** %s\n", data.Matches)
+			reportDetails += fmt.Sprintf("🌐 **Domain Status:** %s\n", vtUrlReport)
+
+			// STEP 4: Entity Enrichment (Check IPs found inside content)
+			if len(newEntities) > 0 {
+				for _, e := range newEntities {
+					if e.Type == "IP_ADDRESS" {
+						vtReport, badScore, _ := services.CheckIPReputation(e.Value, apiKey)
+
+						if badScore > 0 {
+							reportDetails += fmt.Sprintf("🚫 **Malicious IP:** %s (%s)\n", e.Value, vtReport)
+							fmt.Printf("🚨 MALICIOUS IP FOUND: %s\n", e.Value)
+						} else {
+							reportDetails += fmt.Sprintf("✅ Clean IP: %s\n", e.Value)
+							fmt.Printf("[VT] Clean IP found: %s\n", e.Value)
+						}
+					}
+					// Log finding to console
+					fmt.Printf("  -> New Entity: [%s] %s\n", e.Type, e.Value)
+				}
+			}
+			// -----------------------------
+
+			// Send Detailed Slack Notification
+			err := reports.SendSlackAlert(slackWebhook, target.URL, data.CriticalityScore, len(newEntities), reportDetails)
+			if err != nil {
+				fmt.Printf("Slack Notification Error: %v\n", err)
+			} else {
+				fmt.Println("-> Slack alert sent SUCCESSFULLY.")
 			}
 		}
 	}
 
-	// Save current scan
+	// STEP 5: Save Results to Database
 	saveErr := database.SaveDarkWebContent(data)
 	if saveErr == nil && data.ID != 0 {
 		database.SaveEntities(data.ID, data.Entities)
@@ -596,10 +658,9 @@ func scanTargetWithDiff(target models.Target) {
 		database.UpdateTargetStatus(target.ID, "DB Error")
 	}
 
-	time.Sleep(10 * time.Second) // Rate limiting
+	// Rate limiting (Politeness delay)
+	time.Sleep(10 * time.Second)
 }
-
-// API Endpoints (JSON responses for programmatic access)
 
 // apiTargetsHandler returns all targets as JSON
 func apiTargetsHandler(w http.ResponseWriter, r *http.Request) {

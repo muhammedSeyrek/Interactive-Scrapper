@@ -1,59 +1,72 @@
 version: '3.8'
 
 services:
-  
-  tor:
-    image: osminogin/tor-simple
-    container_name: darkweb_tor
+  app:
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    build: .
+    container_name: interactive_scraper_app
     ports:
-      - "9050:9050" 
+      - "9090:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      tor:
+        condition: service_started
+    
+    env_file:
+      - .env
+
+    environment:
+      - DB_HOST=postgres
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_PORT=5432
+      - TOR_PROXY=socks5://tor:9050
+
     networks:
       - cti_net
-    restart: always
+    volumes:
+      - ./mitre_rules.json:/app/mitre_rules.json
+      - ./targets.yaml:/app/targets.yaml
 
-
-  db:
-    image: postgres:15-alpine
+  postgres:
     container_name: darkweb_postgres
+    image: postgres:15-alpine
+    env_file:
+      - .env
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=darkweb_db
-    ports:
-      - "5433:5432"
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    
+    
+    networks:
+      - cti_net
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
       - ./init-admin.sql:/docker-entrypoint-initdb.d/02-init-admin.sql
-    networks:
-      - cti_net
-    healthcheck: 
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  app:
-    build: . 
-    container_name: interactive_scraper_app
+  tor:
+    container_name: darkweb_tor
+    image: osminogin/tor-simple
     ports:
-      - "8080:8080" # 
-    environment:
-      # Important: we write host=db. Because in docker-compose, the service name acts as the hostname.
-      - DB_SOURCE=host=db port=5432 user=postgres password=postgres dbname=darkweb_db sslmode=disable
-      - TOR_PROXY=socks5://tor:9050
-    depends_on:
-      db:
-        condition: service_healthy # 
-      tor : 
-        condition: service_started
+      - "9050:9050"
     networks:
       - cti_net
-
-  
-
-volumes:
-  postgres_data:
+    restart: always
 
 networks:
   cti_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
