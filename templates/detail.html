@@ -167,6 +167,32 @@
                     <div class="meta-row"><span class="meta-label">DATE:</span> <span class="meta-val">{{ .PublishedDate.Format "2006-01-02 15:04" }}</span></div>
                     <div class="meta-row"><span class="meta-label">CAT:</span> <span class="meta-val">{{ .Category }}</span></div>
                 </div>
+                <div class="panel" style="border-left: 4px solid var(--warn);">
+                    <h3>Risk & Kategori Yönetimi</h3>
+                    <form action="/view?id={{ .ID }}" method="POST" style="display: flex; flex-direction: column; gap: 15px;">
+                        
+                        <div>
+                            <label style="color: #8c9cad; font-size: 11px; display: block; margin-bottom: 5px;">RİSK SKORU (1-10)</label>
+                            <input type="number" name="score" value="{{ .CriticalityScore }}" min="1" max="10" 
+                                style="width: 100%; background: #000; border: 1px solid var(--border); color: #fff; padding: 8px; font-family: inherit;">
+                        </div>
+
+                        <div>
+                            <label style="color: #8c9cad; font-size: 11px; display: block; margin-bottom: 5px;">KATEGORİ</label>
+                            <select name="category" style="width: 100%; background: #000; border: 1px solid var(--border); color: #fff; padding: 8px; font-family: inherit;">
+                                <option value="Critical Threat" {{ if eq .Category "Critical Threat" }}selected{{ end }}>Critical Threat</option>
+                                <option value="Suspicious" {{ if eq .Category "Suspicious" }}selected{{ end }}>Suspicious</option>
+                                <option value="General Info" {{ if eq .Category "General Info" }}selected{{ end }}>General Info</option>
+                                <option value="Financial / Market" {{ if eq .Category "Financial / Market" }}selected{{ end }}>Financial / Market</option>
+                                <option value="Known Malicious Site" {{ if eq .Category "Known Malicious Site" }}selected{{ end }}>Known Malicious Site</option>
+                            </select>
+                        </div>
+
+                        <button type="submit" class="btn" style="background: var(--warn); color: #000; border: none; font-weight: bold; margin-top: 5px;">
+                            GÜNCELLE
+                        </button>
+                    </form>
+                </div>
 
                 <div class="panel">
                     <h3>Intelligence Findings</h3>
@@ -211,11 +237,6 @@
                             <span style="color: #555; font-size: 12px;">No Screenshot Available</span>
                         {{ end }}
                     </div>
-                </div>
-
-                <div class="panel">
-                    <h3>Raw Content Preview</h3>
-                    <pre>{{ .Content }}</pre>
                 </div>
             </div>
         </div>
