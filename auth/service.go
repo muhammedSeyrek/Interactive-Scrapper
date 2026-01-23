@@ -2,6 +2,7 @@ package auth
 
 import (
 	"interactive-scraper/database"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -15,7 +16,7 @@ var jwtKey = []byte(getJwtSecret())
 func getJwtSecret() string {
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {
-		return "varsayilan_ama_guvensiz_anahtar" // Sadece test için
+		log.Fatal("JWT_SECRET ortam değişkeni ayarlanmamış!")
 	}
 	return secret
 }

@@ -8,7 +8,7 @@ services:
     build: .
     container_name: interactive_scraper_app
     ports:
-      - "9090:8080"
+      - "8080:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -29,8 +29,8 @@ services:
     networks:
       - cti_net
     volumes:
-      - ./mitre_rules.json:/app/mitre_rules.json
-      - ./targets.yaml:/app/targets.yaml
+      - ./mitre_rules.json:/root/mitre_rules.json
+      - ./targets.yaml:/root/targets.yaml
 
   postgres:
     container_name: darkweb_postgres

@@ -109,8 +109,8 @@ func main() {
 	http.HandleFunc("/api/changes", apiMiddleware(apiChangesHandler))
 	http.HandleFunc("/", auth.Middleware(dashboardHandler))
 
-	port := ":8080"
-	fmt.Printf("Starting server on port: http://localhost%s\n", port)
+	port := "0.0.0.0:8080"
+	fmt.Printf("Starting server on port: %s\n", port)
 	log.Fatal(http.ListenAndServe(port, nil))
 
 }
